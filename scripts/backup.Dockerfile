@@ -1,5 +1,5 @@
 FROM alpine:3.20
-RUN apk add --no-cache postgresql17-client bash curl tar gzip findutils tzdata coreutils
+RUN apk add --no-cache postgresql-client bash curl tar gzip findutils tzdata coreutils
 COPY backup.sh /usr/local/bin/backup.sh
 RUN chmod +x /usr/local/bin/backup.sh
 # Cron entry — daily at 02:30 UTC. Override via BACKUP_CRON env if you want.
