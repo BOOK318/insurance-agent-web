@@ -1,0 +1,11 @@
+{
+  "name": "InsuranceAI",
+  "short_name": "InsuranceAI",
+  "description": "保險Agent智能助手",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1e40af",
+  "theme_color": "#1e40af",
+  "orientation": "portrait",
+  "icons": []
+}

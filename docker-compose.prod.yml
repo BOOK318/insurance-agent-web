@@ -1,0 +1,132 @@
+name: insurance-agent-web
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: insurance
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d insurance"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    # Bind to loopback only — the app reaches the DB via the docker network.
+    # Exposing 5432 on the LAN is unnecessary and risks brute-force attempts
+    # if the Mac mini is on a shared / branch office network.
+    ports:
+      - "127.0.0.1:${DB_PORT:-5432}:5432"
+
+  migrate:
+    image: ${APP_IMAGE}
+    restart: "no"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://admin:${DB_PASSWORD}@db:5432/insurance
+    command: ["npx", "node-pg-migrate", "-d", "DATABASE_URL", "up"]
+
+  app:
+    image: ${APP_IMAGE}
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      DATABASE_URL: postgres://admin:${DB_PASSWORD}@db:5432/insurance
+      JWT_SECRET: ${JWT_SECRET}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      NEXT_PUBLIC_APP_URL: https://${TUNNEL_DOMAIN}
+      OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:7b}
+      OLLAMA_VISION_MODEL: ${OLLAMA_VISION_MODEL:-qwen2.5vl:7b}
+      WHISPER_URL: ${WHISPER_URL:-http://host.docker.internal:9000/inference}
+      TRANSCRIBE_MAX_BYTES: ${TRANSCRIBE_MAX_BYTES:-26214400}
+      DOCUMENT_STORAGE_DIR: /storage/documents
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY}
+      NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${NEXT_PUBLIC_VAPID_PUBLIC_KEY}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:admin@team.local}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN:-}
+    labels:
+      com.centurylinklabs.watchtower.enable: "true"
+    volumes:
+      - documents:/storage/documents
+    ports:
+      - "${APP_PORT:-3000}:3000"
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+      - app
+
+  watchtower:
+    image: containrrr/watchtower:latest
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      WATCHTOWER_LABEL_ENABLE: "true"
+      WATCHTOWER_CLEANUP: "true"
+      WATCHTOWER_POLL_INTERVAL: ${WATCHTOWER_POLL_INTERVAL:-3600}
+      REPO_USER: ${GHCR_USER:-}
+      REPO_PASS: ${GHCR_READ_TOKEN:-}
+
+  # Reminders worker — sends pushes for due reminders + auto-creates
+  # renewal reminders for policies expiring in 30/7/1 days.
+  worker:
+    image: ${APP_IMAGE}
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      DATABASE_URL: postgres://admin:${DB_PASSWORD}@db:5432/insurance
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY}
+      NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${NEXT_PUBLIC_VAPID_PUBLIC_KEY}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:admin@team.local}
+      WORKER_POLL_MS: ${WORKER_POLL_MS:-60000}
+    command: ["node", "worker/reminders-worker.mjs"]
+    labels:
+      com.centurylinklabs.watchtower.enable: "true"
+
+  # Daily backup of Postgres + uploaded documents to a host-mounted folder.
+  backup:
+    build:
+      context: ./scripts
+      dockerfile: backup.Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGHOST: db
+      PGUSER: admin
+      PGDATABASE: insurance
+      PGPASSWORD: ${DB_PASSWORD}
+      BACKUP_DIR: /backups
+      DOCUMENT_STORAGE_DIR: /storage/documents
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-30}
+      BACKUP_NOTIFY_URL: ${BACKUP_NOTIFY_URL:-}
+      TZ: ${TZ:-Asia/Hong_Kong}
+    volumes:
+      - ${BACKUP_HOST_DIR:-./backups}:/backups
+      - documents:/storage/documents:ro
+
+volumes:
+  pgdata:
+  documents:

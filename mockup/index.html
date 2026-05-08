@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>InsuranceAI — 版面設計</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+  .screen { display: none; }
+  .screen.active { display: flex; }
+  .phone { width: 390px; height: 844px; background: #f9fafb; border-radius: 44px; overflow: hidden; border: 8px solid #1a1a2e; box-shadow: 0 40px 80px rgba(0,0,0,0.4); position: relative; }
+  .status-bar { background: #1e40af; color: white; padding: 12px 20px 8px; font-size: 12px; display: flex; justify-content: space-between; }
+  .bottom-nav { position: absolute; bottom: 0; left: 0; right: 0; background: white; border-top: 1px solid #e5e7eb; display: flex; padding: 8px 0 20px; }
+  .nav-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 10px; color: #9ca3af; cursor: pointer; padding: 4px 0; }
+  .nav-item.active { color: #1d4ed8; font-weight: 600; }
+  .scroll-area { height: calc(844px - 60px - 88px - 16px); overflow-y: auto; padding: 16px; }
+  .card { background: white; border-radius: 16px; padding: 16px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); border: 1px solid #f1f5f9; }
+  .btn-primary { background: #1d4ed8; color: white; border: none; border-radius: 12px; padding: 12px 20px; font-size: 14px; font-weight: 600; cursor: pointer; width: 100%; }
+  .btn-secondary { background: #f1f5f9; color: #374151; border: none; border-radius: 12px; padding: 12px 20px; font-size: 14px; font-weight: 600; cursor: pointer; width: 100%; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 500; }
+  .badge-green { background: #dcfce7; color: #15803d; }
+  .badge-orange { background: #ffedd5; color: #c2410c; }
+  .badge-yellow { background: #fef9c3; color: #a16207; }
+  .badge-blue { background: #dbeafe; color: #1d4ed8; }
+  .chat-bubble-user { background: #1d4ed8; color: white; border-radius: 18px 18px 4px 18px; padding: 10px 14px; font-size: 14px; max-width: 80%; align-self: flex-end; }
+  .chat-bubble-ai { background: white; color: #1f2937; border-radius: 18px 18px 18px 4px; padding: 10px 14px; font-size: 14px; max-width: 85%; border: 1px solid #e5e7eb; }
+  .tab-btn { padding: 6px 16px; border-radius: 20px; font-size: 12px; font-weight: 500; cursor: pointer; border: none; }
+  .tab-active { background: #1d4ed8; color: white; }
+  .tab-inactive { background: #f1f5f9; color: #6b7280; }
+</style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+
+<!-- 版面選擇器 -->
+<div class="fixed top-0 left-0 right-0 bg-white border-b border-gray-200 z-50 px-4 py-3">
+  <div class="max-w-6xl mx-auto">
+    <div class="flex items-center gap-3 mb-3">
+      <span class="text-2xl">🛡️</span>
+      <h1 class="text-lg font-bold text-gray-900">InsuranceAI — App版面設計</h1>
+      <span class="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">Prototype</span>
+    </div>
+    <div class="flex gap-2 overflow-x-auto pb-1">
+      <button onclick="showScreen('login')" id="btn-login" class="tab-btn tab-active whitespace-nowrap">🔐 登入</button>
+      <button onclick="showScreen('dashboard')" id="btn-dashboard" class="tab-btn tab-inactive whitespace-nowrap">🏠 主頁</button>
+      <button onclick="showScreen('clients')" id="btn-clients" class="tab-btn tab-inactive whitespace-nowrap">👤 客戶列表</button>
+      <button onclick="showScreen('client-detail')" id="btn-client-detail" class="tab-btn tab-inactive whitespace-nowrap">📋 客戶詳情</button>
+      <button onclick="showScreen('ai')" id="btn-ai" class="tab-btn tab-inactive whitespace-nowrap">💬 AI助手</button>
+      <button onclick="showScreen('reminders')" id="btn-reminders" class="tab-btn tab-inactive whitespace-nowrap">🔔 提醒</button>
+      <button onclick="showScreen('head')" id="btn-head" class="tab-btn tab-inactive whitespace-nowrap">👑 Team總覽</button>
+    </div>
+  </div>
+</div>
+
+<div class="pt-28 pb-8 flex justify-center">
+  <div class="phone">
+
+    <!-- 登入頁 -->
+    <div id="screen-login" class="screen active flex-col h-full" style="background: linear-gradient(135deg, #1e3a8a, #1d4ed8);">
+      <div class="flex-1 flex flex-col items-center justify-center px-8">
+        <div style="font-size: 64px; margin-bottom: 12px;">🛡️</div>
+        <h1 style="color: white; font-size: 28px; font-weight: 700; margin-bottom: 4px;">InsuranceAI</h1>
+        <p style="color: rgba(255,255,255,0.6); font-size: 14px; margin-bottom: 40px;">保險Agent智能助手</p>
+        <div style="background: white; border-radius: 24px; padding: 28px; width: 100%;">
+          <div style="margin-bottom: 16px;">
+            <label style="font-size: 13px; color: #6b7280; display: block; margin-bottom: 6px;">電郵</label>
+            <div style="border: 1.5px solid #e5e7eb; border-radius: 12px; padding: 12px 14px; font-size: 14px; color: #9ca3af;">agent@team.local</div>
+          </div>
+          <div style="margin-bottom: 24px;">
+            <label style="font-size: 13px; color: #6b7280; display: block; margin-bottom: 6px;">密碼</label>
+            <div style="border: 1.5px solid #1d4ed8; border-radius: 12px; padding: 12px 14px; font-size: 14px; color: #374151;">••••••••</div>
+          </div>
+          <button onclick="showScreen('dashboard')" class="btn-primary">登入</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 主頁 Dashboard -->
+    <div id="screen-dashboard" class="screen flex-col h-full">
+      <div class="status-bar">
+        <span>9:41</span><span>🛡️ InsuranceAI</span><span>●●●</span>
+      </div>
+      <div style="background: #1e40af; color: white; padding: 16px 16px 20px;">
+        <p style="font-size: 13px; opacity: 0.7;">你好，陳大文 👋</p>
+        <h2 style="font-size: 20px; font-weight: 700; margin-top: 2px;">今日概覽</h2>
+      </div>
+      <div class="scroll-area" style="margin-top: -8px; padding-top: 20px;">
+        <!-- 統計卡 -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px;">
+          <div class="card" style="padding: 14px;" onclick="showScreen('clients')">
+            <div style="width: 36px; height: 36px; background: #dbeafe; border-radius: 10px; display: flex; align-items: center; justify-content: center; margin-bottom: 10px; font-size: 18px;">👤</div>
+            <div style="font-size: 26px; font-weight: 700; color: #1e40af;">28</div>
+            <div style="font-size: 12px; color: #9ca3af; margin-top: 2px;">我的客戶</div>
+          </div>
+          <div class="card" style="padding: 14px;" onclick="showScreen('clients')">
+            <div style="width: 36px; height: 36px; background: #dcfce7; border-radius: 10px; display: flex; align-items: center; justify-content: center; margin-bottom: 10px; font-size: 18px;">📋</div>
+            <div style="font-size: 26px; font-weight: 700; color: #15803d;">45</div>
+            <div style="font-size: 12px; color: #9ca3af; margin-top: 2px;">有效保單</div>
+          </div>
+          <div class="card" style="padding: 14px;">
+            <div style="width: 36px; height: 36px; background: #ffedd5; border-radius: 10px; display: flex; align-items: center; justify-content: center; margin-bottom: 10px; font-size: 18px;">🏥</div>
+            <div style="font-size: 26px; font-weight: 700; color: #c2410c;">3</div>
+            <div style="font-size: 12px; color: #9ca3af; margin-top: 2px;">待處理Claim</div>
+          </div>
+          <div class="card" style="padding: 14px;" onclick="showScreen('reminders')">
+            <div style="width: 36px; height: 36px; background: #f3e8ff; border-radius: 10px; display: flex; align-items: center; justify-content: center; margin-bottom: 10px; font-size: 18px;">🔔</div>
+            <div style="font-size: 26px; font-weight: 700; color: #7c3aed;">5</div>
+            <div style="font-size: 12px; color: #9ca3af; margin-top: 2px;">待辦提醒</div>
+          </div>
+        </div>
+        <!-- 生日提醒 -->
+        <div style="background: #fdf2f8; border: 1px solid #fbcfe8; border-radius: 16px; padding: 14px; margin-bottom: 12px;">
+          <p style="font-size: 13px; font-weight: 600; color: #9d174d; margin-bottom: 8px;">🎂 即將生日</p>
+          <div style="font-size: 13px; color: #be185d; margin-bottom: 4px;">李小明 — 今日！🎉</div>
+          <div style="font-size: 13px; color: #be185d;">王美麗 — 3日後</div>
+        </div>
+        <!-- 快捷操作 -->
+        <div class="card">
+          <p style="font-size: 14px; font-weight: 600; margin-bottom: 12px;">快捷操作</p>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+            <button onclick="showScreen('clients')" class="btn-primary" style="font-size: 13px; padding: 10px;">＋ 新增客戶</button>
+            <button onclick="showScreen('ai')" class="btn-secondary" style="font-size: 13px; padding: 10px;">💬 AI助手</button>
+          </div>
+        </div>
+      </div>
+      <div class="bottom-nav">
+        <div class="nav-item active">🏠<span>主頁</span></div>
+        <div class="nav-item" onclick="showScreen('clients')">👤<span>客戶</span></div>
+        <div class="nav-item">📋<span>保單</span></div>
+        <div class="nav-item" onclick="showScreen('reminders')">🔔<span>提醒</span></div>
+        <div class="nav-item" onclick="showScreen('ai')">💬<span>AI</span></div>
+      </div>
+    </div>
+
+    <!-- 客戶列表 -->
+    <div id="screen-clients" class="screen flex-col h-full">
+      <div class="status-bar"><span>9:41</span><span>客戶</span><span>●●●</span></div>
+      <div style="padding: 16px 16px 0;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <h2 style="font-size: 20px; font-weight: 700;">我的客戶</h2>
+          <button style="background: #1d4ed8; color: white; border: none; border-radius: 10px; padding: 6px 14px; font-size: 13px; font-weight: 600;">＋ 新增</button>
+        </div>
+        <div style="background: #f9fafb; border: 1.5px solid #e5e7eb; border-radius: 12px; padding: 10px 14px; display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+          <span style="color: #9ca3af;">🔍</span>
+          <span style="color: #9ca3af; font-size: 14px;">搜尋姓名或電話...</span>
+        </div>
+      </div>
+      <div class="scroll-area" style="padding-top: 0;">
+        <!-- 客戶卡 -->
+        <div onclick="showScreen('client-detail')" class="card" style="cursor: pointer; display: flex; align-items: center; gap: 12px;">
+          <div style="width: 44px; height: 44px; background: #dbeafe; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0;">👤</div>
+          <div style="flex: 1;">
+            <div style="font-size: 15px; font-weight: 600;">陳大文</div>
+            <div style="font-size: 12px; color: #9ca3af; margin-top: 1px;">Chan Tai Man · 工程師</div>
+          </div>
+          <div style="text-align: right;">
+            <div style="font-size: 13px; color: #6b7280;">9123 4567</div>
+            <span class="badge badge-green" style="margin-top: 4px;">3份保單</span>
+          </div>
+        </div>
+        <div class="card" style="display: flex; align-items: center; gap: 12px;">
+          <div style="width: 44px; height: 44px; background: #fce7f3; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0;">👤</div>
+          <div style="flex: 1;">
+            <div style="font-size: 15px; font-weight: 600;">李小明 🎂</div>
+            <div style="font-size: 12px; color: #9ca3af; margin-top: 1px;">Lee Siu Ming · 教師</div>
+          </div>
+          <div style="text-align: right;">
+            <div style="font-size: 13px; color: #6b7280;">9876 5432</div>
+            <span class="badge badge-blue" style="margin-top: 4px;">2份保單</span>
+          </div>
+        </div>
+        <div class="card" style="display: flex; align-items: center; gap: 12px;">
+          <div style="width: 44px; height: 44px; background: #d1fae5; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0;">👤</div>
+          <div style="flex: 1;">
+            <div style="font-size: 15px; font-weight: 600;">王美麗</div>
+            <div style="font-size: 12px; color: #9ca3af; margin-top: 1px;">Wong Mei Lai · 護士</div>
+          </div>
+          <div style="text-align: right;">
+            <div style="font-size: 13px; color: #6b7280;">6543 2100</div>
+            <span class="badge badge-orange" style="margin-top: 4px;">1份保單</span>
+          </div>
+        </div>
+        <div class="card" style="display: flex; align-items: center; gap: 12px;">
+          <div style="width: 44px; height: 44px; background: #fef3c7; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0;">👤</div>
+          <div style="flex: 1;">
+            <div style="font-size: 15px; font-weight: 600;">張偉明</div>
+            <div style="font-size: 12px; color: #9ca3af; margin-top: 1px;">Cheung Wai Ming · 商人</div>
+          </div>
+          <div style="text-align: right;">
+            <div style="font-size: 13px; color: #6b7280;">5567 8901</div>
+            <span class="badge badge-green" style="margin-top: 4px;">5份保單</span>
+          </div>
+        </div>
+      </div>
+      <div class="bottom-nav">
+        <div class="nav-item" onclick="showScreen('dashboard')">🏠<span>主頁</span></div>
+        <div class="nav-item active">👤<span>客戶</span></div>
+        <div class="nav-item">📋<span>保單</span></div>
+        <div class="nav-item" onclick="showScreen('reminders')">🔔<span>提醒</span></div>
+        <div class="nav-item" onclick="showScreen('ai')">💬<span>AI</span></div>
+      </div>
+    </div>
+
+    <!-- 客戶詳情 -->
+    <div id="screen-client-detail" class="screen flex-col h-full">
+      <div class="status-bar"><span>9:41</span><span>客戶詳情</span><span>●●●</span></div>
+      <div style="background: #1e40af; color: white; padding: 12px 16px 20px; display: flex; align-items: center; gap: 12px;">
+        <button onclick="showScreen('clients')" style="background: rgba(255,255,255,0.2); border: none; color: white; border-radius: 8px; padding: 6px 10px; font-size: 13px; cursor: pointer;">← 返回</button>
+        <h2 style="font-size: 18px; font-weight: 700;">陳大文</h2>
+      </div>
+      <div class="scroll-area" style="margin-top: -8px; padding-top: 16px;">
+        <!-- 個人資料 -->
+        <div class="card">
+          <p style="font-size: 13px; font-weight: 600; color: #6b7280; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.5px;">個人資料</p>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 13px;">
+            <div><p style="color: #9ca3af; font-size: 11px;">英文名</p><p style="font-weight: 500;">Chan Tai Man</p></div>
+            <div><p style="color: #9ca3af; font-size: 11px;">年齡</p><p style="font-weight: 500;">42歲</p></div>
+            <div><p style="color: #9ca3af; font-size: 11px;">電話</p><p style="font-weight: 500; color: #1d4ed8;">9123 4567</p></div>
+            <div><p style="color: #9ca3af; font-size: 11px;">職業</p><p style="font-weight: 500;">高級工程師</p></div>
+            <div style="grid-column: span 2;"><p style="color: #9ca3af; font-size: 11px;">年收入</p><p style="font-weight: 500;">HK$85萬</p></div>
+          </div>
+          <div style="border-top: 1px solid #f1f5f9; margin-top: 10px; padding-top: 10px; font-size: 13px;">
+            <p style="color: #9ca3af; font-size: 11px; margin-bottom: 4px;">家庭背景</p>
+            <p>已婚，育有2子女（8歲、5歲）。太太全職主婦。</p>
+          </div>
+          <div style="margin-top: 8px; font-size: 13px;">
+            <p style="color: #9ca3af; font-size: 11px; margin-bottom: 4px;">資產物業</p>
+            <p>沙田自住物業一間，股票投資約HK$50萬。</p>
+          </div>
+        </div>
+        <!-- 保單 -->
+        <div class="card">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <p style="font-size: 13px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px;">保單（3份）</p>
+            <button style="background: none; border: none; color: #1d4ed8; font-size: 13px; font-weight: 600; cursor: pointer;">＋ 新增</button>
+          </div>
+          <div style="border: 1px solid #f1f5f9; border-radius: 12px; padding: 12px; margin-bottom: 8px;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+              <div><p style="font-size: 14px; font-weight: 600;">友邦終身壽險</p><p style="font-size: 12px; color: #9ca3af;">AIA · 保單號: AA12345</p></div>
+              <span class="badge badge-green">有效</span>
+            </div>
+            <p style="font-size: 12px; color: #6b7280; margin-top: 6px;">月繳 HK$3,200 · 保額 HK$200萬</p>
+          </div>
+          <div style="border: 1px solid #f1f5f9; border-radius: 12px; padding: 12px; margin-bottom: 8px;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+              <div><p style="font-size: 14px; font-weight: 600;">醫療保險（高端）</p><p style="font-size: 12px; color: #9ca3af;">Blue Cross · BP98765</p></div>
+              <span class="badge badge-green">有效</span>
+            </div>
+            <p style="font-size: 12px; color: #6b7280; margin-top: 6px;">年繳 HK$18,000 · 到期 2025-12-31</p>
+          </div>
+          <div style="border: 1px solid #fef3c7; border-radius: 12px; padding: 12px; background: #fffbeb;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+              <div><p style="font-size: 14px; font-weight: 600;">危疾保險</p><p style="font-size: 12px; color: #9ca3af;">Manulife · ML54321</p></div>
+              <span class="badge badge-orange">⚠️ 30日到期</span>
+            </div>
+            <p style="font-size: 12px; color: #6b7280; margin-top: 6px;">年繳 HK$8,500 · 到期 2026-06-01</p>
+          </div>
+        </div>
+        <!-- AI建議按鈕 -->
+        <button onclick="showScreen('ai')" class="btn-primary" style="margin-bottom: 12px;">💡 AI銷售建議</button>
+      </div>
+      <div class="bottom-nav">
+        <div class="nav-item" onclick="showScreen('dashboard')">🏠<span>主頁</span></div>
+        <div class="nav-item active">👤<span>客戶</span></div>
+        <div class="nav-item">📋<span>保單</span></div>
+        <div class="nav-item" onclick="showScreen('reminders')">🔔<span>提醒</span></div>
+        <div class="nav-item" onclick="showScreen('ai')">💬<span>AI</span></div>
+      </div>
+    </div>
+
+    <!-- AI助手 -->
+    <div id="screen-ai" class="screen flex-col h-full">
+      <div class="status-bar"><span>9:41</span><span>AI助手</span><span>●●●</span></div>
+      <div style="padding: 14px 16px 10px; border-bottom: 1px solid #f1f5f9; background: white;">
+        <h2 style="font-size: 18px; font-weight: 700;">💬 AI助手</h2>
+        <p style="font-size: 12px; color: #9ca3af; margin-top: 2px;">由Claude驅動</p>
+      </div>
+      <div style="flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; background: #f9fafb;">
+        <div class="chat-bubble-ai">你好！我係你嘅保險AI助手 🛡️<br><br>你可以問我：<br>• 分析客戶保障缺口<br>• Claim申請流程<br>• 銷售策略建議</div>
+        <div class="chat-bubble-user" style="align-self: flex-end;">幫我分析陳大文嘅保障缺口</div>
+        <div class="chat-bubble-ai">
+          根據陳大文嘅背景分析：<br><br>
+          <strong>✅ 已有保障</strong><br>
+          • 壽險 HK$200萬<br>
+          • 醫療（高端）<br>
+          • 危疾保險<br><br>
+          <strong>⚠️ 保障缺口</strong><br>
+          • 子女教育儲蓄計劃未有<br>
+          • 太太無任何保障<br>
+          • 危疾保額偏低（建議HK$100萬）<br><br>
+          <strong>💡 建議</strong><br>
+          優先跟進教育儲蓄，佢兩個小朋友分別8同5歲，時機啱！
+        </div>
+        <div class="chat-bubble-user" style="align-self: flex-end;">住院Claim要咩文件？</div>
+        <div class="chat-bubble-ai">
+          🏥 住院Claim所需文件：<br><br>
+          1. 住院摘要（醫院蓋章）<br>
+          2. 收據正本<br>
+          3. 診斷書<br>
+          4. 保單正本<br><br>
+          出院後30日內提交，處理時間約10-15個工作天。
+        </div>
+      </div>
+      <div style="padding: 12px 16px 24px; background: white; border-top: 1px solid #f1f5f9; display: flex; gap: 8px;">
+        <div style="flex: 1; background: #f9fafb; border: 1.5px solid #e5e7eb; border-radius: 24px; padding: 10px 16px; font-size: 14px; color: #9ca3af;">問AI助手...</div>
+        <button style="background: #1d4ed8; color: white; border: none; border-radius: 50%; width: 44px; height: 44px; font-size: 18px; cursor: pointer; flex-shrink: 0;">↑</button>
+      </div>
+    </div>
+
+    <!-- 提醒 -->
+    <div id="screen-reminders" class="screen flex-col h-full">
+      <div class="status-bar"><span>9:41</span><span>提醒</span><span>●●●</span></div>
+      <div style="padding: 16px 16px 0;">
+        <h2 style="font-size: 20px; font-weight: 700; margin-bottom: 12px;">提醒</h2>
+      </div>
+      <div class="scroll-area" style="padding-top: 0;">
+        <p style="font-size: 12px; font-weight: 600; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">🎂 30日內生日</p>
+        <div style="background: #fdf2f8; border: 1px solid #fbcfe8; border-radius: 16px; padding: 12px 14px; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center;">
+          <div><p style="font-size: 14px; font-weight: 600; color: #9d174d;">李小明</p><p style="font-size: 12px; color: #be185d;">9876 5432</p></div>
+          <span style="font-size: 13px; font-weight: 600; color: #9d174d;">🎉 今日！</span>
+        </div>
+        <div style="background: #fdf2f8; border: 1px solid #fbcfe8; border-radius: 16px; padding: 12px 14px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center;">
+          <div><p style="font-size: 14px; font-weight: 600; color: #9d174d;">王美麗</p><p style="font-size: 12px; color: #be185d;">6543 2100</p></div>
+          <span style="font-size: 13px; font-weight: 600; color: #be185d;">3日後</span>
+        </div>
+        <p style="font-size: 12px; font-weight: 600; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">🔔 待辦提醒</p>
+        <div class="card" style="display: flex; gap: 12px; align-items: flex-start;">
+          <span style="font-size: 20px;">📋</span>
+          <div style="flex: 1;">
+            <p style="font-size: 14px; font-weight: 600;">陳大文危疾保單即將到期</p>
+            <p style="font-size: 12px; color: #9ca3af; margin-top: 2px;">陳大文</p>
+            <p style="font-size: 12px; color: #ef4444; margin-top: 4px; font-weight: 500;">⚠️ 30日後到期</p>
+          </div>
+        </div>
+        <div class="card" style="display: flex; gap: 12px; align-items: flex-start;">
+          <span style="font-size: 20px;">📞</span>
+          <div style="flex: 1;">
+            <p style="font-size: 14px; font-weight: 600;">跟進張偉明年金計劃</p>
+            <p style="font-size: 12px; color: #9ca3af; margin-top: 2px;">張偉明</p>
+            <p style="font-size: 12px; color: #1d4ed8; margin-top: 4px;">2026-05-10</p>
+          </div>
+        </div>
+      </div>
+      <div class="bottom-nav">
+        <div class="nav-item" onclick="showScreen('dashboard')">🏠<span>主頁</span></div>
+        <div class="nav-item" onclick="showScreen('clients')">👤<span>客戶</span></div>
+        <div class="nav-item">📋<span>保單</span></div>
+        <div class="nav-item active">🔔<span>提醒</span></div>
+        <div class="nav-item" onclick="showScreen('ai')">💬<span>AI</span></div>
+      </div>
+    </div>
+
+    <!-- Head總覽 -->
+    <div id="screen-head" class="screen flex-col h-full" style="background: #f9fafb;">
+      <div style="background: #111827; color: white; padding: 12px 16px 6px; display: flex; justify-content: space-between; align-items: center;">
+        <span style="font-size: 12px;">9:41</span><span style="font-size: 13px; font-weight: 600;">👑 Team總覽</span><span style="font-size: 12px;">●●●</span>
+      </div>
+      <div style="background: #111827; color: white; padding: 12px 16px 20px;">
+        <h2 style="font-size: 20px; font-weight: 700;">Team A 業績</h2>
+        <p style="font-size: 13px; opacity: 0.6; margin-top: 2px;">Team Head · 李經理</p>
+      </div>
+      <div class="scroll-area" style="padding-top: 16px;">
+        <!-- 全Team總計 -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 16px;">
+          <div class="card" style="padding: 12px; text-align: center;">
+            <div style="font-size: 22px; font-weight: 700; color: #1d4ed8;">156</div>
+            <div style="font-size: 11px; color: #9ca3af;">總客戶</div>
+          </div>
+          <div class="card" style="padding: 12px; text-align: center;">
+            <div style="font-size: 22px; font-weight: 700; color: #15803d;">284</div>
+            <div style="font-size: 11px; color: #9ca3af;">有效保單</div>
+          </div>
+          <div class="card" style="padding: 12px; text-align: center;">
+            <div style="font-size: 22px; font-weight: 700; color: #c2410c;">12</div>
+            <div style="font-size: 11px; color: #9ca3af;">待處理Claim</div>
+          </div>
+        </div>
+        <!-- Agent業績 -->
+        <div class="card">
+          <p style="font-size: 13px; font-weight: 600; color: #6b7280; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px;">👥 Agent業績</p>
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #f9fafb;">
+            <span style="font-size: 14px; font-weight: 500;">陳大文</span>
+            <div style="display: flex; gap: 12px; font-size: 13px; color: #6b7280;">
+              <span>👤 28</span><span>📋 45</span><span style="color: #c2410c; font-weight: 500;">🏥 3</span>
+            </div>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #f9fafb;">
+            <span style="font-size: 14px; font-weight: 500;">李美玲</span>
+            <div style="display: flex; gap: 12px; font-size: 13px; color: #6b7280;">
+              <span>👤 35</span><span>📋 62</span><span>🏥 1</span>
+            </div>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 0;">
+            <span style="font-size: 14px; font-weight: 500;">張志強</span>
+            <div style="display: flex; gap: 12px; font-size: 13px; color: #6b7280;">
+              <span>👤 22</span><span>📋 38</span><span>🏥 0</span>
+            </div>
+          </div>
+        </div>
+        <!-- 到期保單預警 -->
+        <div style="background: #fff7ed; border: 1px solid #fed7aa; border-radius: 16px; padding: 14px; margin-bottom: 12px;">
+          <p style="font-size: 13px; font-weight: 600; color: #c2410c; margin-bottom: 10px;">⚠️ 30日內到期保單（5份）</p>
+          <div style="font-size: 13px; color: #9a3412; margin-bottom: 6px;">陳大文 · 危疾保險 · Manulife <span style="color: #9ca3af;">· 30日</span></div>
+          <div style="font-size: 13px; color: #9a3412; margin-bottom: 6px;">王美麗 · 醫療保險 · AXA <span style="color: #9ca3af;">· 15日</span></div>
+          <div style="font-size: 13px; color: #9a3412;">張偉明 · 年金計劃 · Manulife <span style="color: #9ca3af;">· 7日</span></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('[id^="btn-"]').forEach(b => { b.classList.remove('tab-active'); b.classList.add('tab-inactive'); });
+  document.getElementById('screen-' + id).classList.add('active');
+  const btn = document.getElementById('btn-' + id);
+  if (btn) { btn.classList.remove('tab-inactive'); btn.classList.add('tab-active'); }
+}
+</script>
+</body>
+</html>

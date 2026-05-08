@@ -1,0 +1,45 @@
+{
+  "name": "insurance-agent-web",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "migrate": "node-pg-migrate -d DATABASE_URL up",
+    "migrate:down": "node-pg-migrate -d DATABASE_URL down",
+    "migrate:create": "node-pg-migrate create",
+    "worker": "node worker/reminders-worker.mjs",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "@sentry/nextjs": "^10.52.0",
+    "bcryptjs": "^2.4.3",
+    "clsx": "^2.1.0",
+    "date-fns": "^3.3.1",
+    "dotenv": "^17.4.2",
+    "jose": "^5.2.3",
+    "lucide-react": "^0.400.0",
+    "next": "^14.2.0",
+    "node-pg-migrate": "^8.0.4",
+    "pdfjs-dist": "^4.10.38",
+    "pg": "^8.11.3",
+    "react": "^18.3.0",
+    "react-dom": "^18.3.0",
+    "tailwind-merge": "^2.3.0",
+    "web-push": "^3.6.7"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.59.1",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/node": "^20.11.0",
+    "@types/pg": "^8.11.0",
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "autoprefixer": "^10.4.19",
+    "postcss": "^8.4.38",
+    "tailwindcss": "^3.4.0",
+    "typescript": "^5.3.3"
+  }
+}

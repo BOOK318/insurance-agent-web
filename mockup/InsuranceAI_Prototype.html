@@ -1,0 +1,1088 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>InsuranceAI — Prototype</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<style>
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background:
+      radial-gradient(1200px 800px at 80% -10%, #dbeafe 0%, transparent 60%),
+      radial-gradient(900px 700px at -10% 110%, #e0e7ff 0%, transparent 55%),
+      #f3f4f6;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang TC", "PingFang HK", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    color: #0f172a;
+    -webkit-font-smoothing: antialiased;
+  }
+  /* Hide scrollbar inside the phone screen */
+  .noscroll::-webkit-scrollbar { display: none; }
+  .noscroll { scrollbar-width: none; }
+
+  /* Screen transition */
+  .screen-enter { animation: screenIn .28s cubic-bezier(.2,.8,.2,1) both; }
+  @keyframes screenIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .slide-enter { animation: slideIn .28s cubic-bezier(.2,.8,.2,1) both; }
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateX(12px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+
+  /* Typing dots */
+  .dot { animation: blink 1.2s infinite ease-in-out; }
+  .dot:nth-child(2) { animation-delay: .15s; }
+  .dot:nth-child(3) { animation-delay: .3s; }
+  @keyframes blink {
+    0%, 80%, 100% { opacity: .25; transform: translateY(0); }
+    40%           { opacity: 1;   transform: translateY(-2px); }
+  }
+
+  /* Subtle pressable */
+  .pressable { transition: transform .12s ease, box-shadow .12s ease, background-color .12s ease; }
+  .pressable:active { transform: scale(.98); }
+
+  /* Phone bezel */
+  .phone-bezel {
+    width: 414px;
+    height: 868px;
+    background: #0b0f17;
+    border-radius: 56px;
+    padding: 12px;
+    box-shadow:
+      0 30px 60px -20px rgba(15,23,42,.35),
+      0 8px 24px -8px rgba(15,23,42,.25),
+      inset 0 0 0 2px #1f2937;
+  }
+  .phone-screen {
+    width: 100%;
+    height: 100%;
+    border-radius: 44px;
+    overflow: hidden;
+    background: #f8fafc;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+  }
+  .screen-frame {
+    flex: 1 1 auto;
+    position: relative;
+    overflow: hidden;
+  }
+  .notch {
+    position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+    width: 120px; height: 30px; background: #0b0f17; border-radius: 999px; z-index: 50;
+  }
+
+  /* Custom shadow */
+  .card-shadow { box-shadow: 0 1px 2px rgba(15,23,42,.04), 0 8px 24px -12px rgba(15,23,42,.12); }
+
+  /* Tabs at top */
+  .demo-tab.active { background:#0b0f17; color:#fff; }
+</style>
+</head>
+<body style="background-color: rgb(255, 255, 255); font-size: 15px;">
+  <div id="root"></div>
+
+  <script type="text/babel" data-presets="env,react">
+  const { useState, useEffect, useRef, useMemo } = React;
+
+  /* =========================================================
+     DATA
+     ========================================================= */
+  const CLIENTS = [
+    {
+      id: "c1",
+      nameZh: "陳大文",
+      nameEn: "Tai Man Chan",
+      occupation: "金融分析師",
+      phone: "+852 9123 4567",
+      age: 38,
+      income: "HK$850,000",
+      avatar: "🧑‍💼",
+      avatarColor: "bg-blue-100 text-blue-700",
+      birthday: false,
+      family: "已婚，育有兩名子女（8歲、5歲），太太為全職主婦。家中經濟支柱為主要受供養人。",
+      assets: "自置物業（九龍塘）、定期存款約 HK$300,000、股票組合約 HK$1.2M。",
+      policies: [
+        { name: "終身人壽保險", company: "藍天人壽", number: "BS-2019-08821", status: "生效", statusTone: "ok", premium: "HK$28,800/年", expiry: "2049-03-15" },
+        { name: "危疾保障", company: "恒安保險", number: "HA-2020-11234", status: "30日到期", statusTone: "warn", premium: "HK$12,400/年", expiry: "2026-06-04" },
+        { name: "醫療住院", company: "藍天人壽", number: "BS-2022-44109", status: "生效", statusTone: "ok", premium: "HK$8,600/年", expiry: "2027-09-01" },
+      ],
+    },
+    {
+      id: "c2",
+      nameZh: "李小明",
+      nameEn: "Siu Ming Lee",
+      occupation: "中學教師",
+      phone: "+852 9876 5432",
+      age: 34,
+      income: "HK$520,000",
+      avatar: "👩‍🏫",
+      avatarColor: "bg-pink-100 text-pink-700",
+      birthday: true,
+      family: "單身，與父母同住，需照顧母親（68歲，糖尿病）。",
+      assets: "公屋租戶、儲蓄約 HK$180,000、強積金結餘約 HK$320,000。",
+      policies: [
+        { name: "醫療保障計劃", company: "恒安保險", number: "HA-2021-77234", status: "生效", statusTone: "ok", premium: "HK$5,400/年", expiry: "2031-04-22" },
+        { name: "意外保障", company: "亞太通保", number: "AT-2023-22810", status: "生效", statusTone: "ok", premium: "HK$1,800/年", expiry: "2028-11-30" },
+      ],
+    },
+    {
+      id: "c3",
+      nameZh: "王美麗",
+      nameEn: "Mei Lai Wong",
+      occupation: "市場主管",
+      phone: "+852 9234 1180",
+      age: 42,
+      income: "HK$1,100,000",
+      avatar: "👩‍💼",
+      avatarColor: "bg-amber-100 text-amber-700",
+      birthday: true,
+      family: "已婚，無子女。先生任職律師，家庭年收入約 HK$2.5M。",
+      assets: "持有兩個自置物業（出租其一），股票及基金組合約 HK$3M。",
+      policies: [
+        { name: "高端醫療保障", company: "藍天人壽", number: "BS-2018-66120", status: "生效", statusTone: "ok", premium: "HK$32,000/年", expiry: "2048-08-19" },
+        { name: "儲蓄人壽", company: "環球互助", number: "GW-2017-91002", status: "生效", statusTone: "ok", premium: "HK$60,000/年", expiry: "2042-02-10" },
+        { name: "年金計劃", company: "藍天人壽", number: "BS-2020-30188", status: "生效", statusTone: "ok", premium: "HK$48,000/年", expiry: "2040-12-01" },
+        { name: "旅遊年保", company: "亞太通保", number: "AT-2024-71203", status: "生效", statusTone: "ok", premium: "HK$1,200/年", expiry: "2026-12-31" },
+      ],
+    },
+    {
+      id: "c4",
+      nameZh: "張偉明",
+      nameEn: "Wai Ming Cheung",
+      occupation: "工程師",
+      phone: "+852 6088 4421",
+      age: 29,
+      income: "HK$640,000",
+      avatar: "👨‍🔧",
+      avatarColor: "bg-emerald-100 text-emerald-700",
+      birthday: false,
+      family: "未婚，與女友同居。父母身體健康。",
+      assets: "租屋、儲蓄約 HK$220,000、加密貨幣組合約 HK$80,000。",
+      policies: [
+        { name: "定期人壽", company: "恒安保險", number: "HA-2024-50932", status: "生效", statusTone: "ok", premium: "HK$3,200/年", expiry: "2034-05-08" },
+      ],
+    },
+  ];
+
+  const TEAM = [
+    { name: "陳大文 (你)", clients: 28, policies: 45, claims: 3, highlight: true },
+    { name: "Vivian Cheng", clients: 34, policies: 52, claims: 1 },
+    { name: "Kelvin Lam", clients: 22, policies: 38, claims: 4, alert: true },
+    { name: "Sandy Ho", clients: 41, policies: 67, claims: 2 },
+    { name: "Marcus Yip", clients: 31, policies: 49, claims: 2 },
+  ];
+
+  const EXPIRING = [
+    { client: "陳大文", policy: "危疾保障 HA-2020-11234", days: 30 },
+    { client: "Kenny Tsang", policy: "醫療住院 BS-2021-99812", days: 14 },
+    { client: "Joanne Ip", policy: "意外保障 AT-2023-44021", days: 22 },
+  ];
+
+  /* =========================================================
+     PRIMITIVES
+     ========================================================= */
+  function Icon({ name, className = "w-5 h-5" }) {
+    // Inline strokes — no external icon set required.
+    const paths = {
+      home: <><path d="M3 11l9-8 9 8" /><path d="M5 10v10h14V10" /></>,
+      users: <><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20c.7-3.4 3.5-5.5 6.5-5.5s5.8 2.1 6.5 5.5" /><circle cx="17" cy="9" r="2.8" /><path d="M15 20c.5-2.5 2.4-4 4-4s3 1 3.5 3" /></>,
+      shield: <><path d="M12 3l8 3v6c0 5-3.5 8.5-8 9-4.5-.5-8-4-8-9V6l8-3z" /></>,
+      bell: <><path d="M6 16V11a6 6 0 1 1 12 0v5l1.5 2H4.5L6 16z" /><path d="M10 19a2 2 0 0 0 4 0" /></>,
+      sparkle: <><path d="M12 3l1.8 4.5L18 9.3l-4.2 1.8L12 15l-1.8-3.9L6 9.3l4.2-1.8L12 3z" /><path d="M19 14l.8 1.7L21.5 16l-1.7.7L19 18l-.8-1.3L16.5 16l1.7-.3L19 14z" /></>,
+      search: <><circle cx="11" cy="11" r="6.5" /><path d="m20 20-3.5-3.5" /></>,
+      plus: <><path d="M12 5v14M5 12h14" /></>,
+      back: <><path d="M15 5l-7 7 7 7" /></>,
+      phone: <><path d="M5 4.5c0-.8.7-1.5 1.5-1.5h2.4c.7 0 1.3.5 1.5 1.2L11 7c.1.6-.1 1.2-.5 1.6L9 10c1 2.4 2.6 4 5 5l1.4-1.5c.4-.4 1-.6 1.6-.5l2.8.6c.7.1 1.2.8 1.2 1.5v2.4c0 .8-.7 1.5-1.5 1.5C11.3 19 5 12.7 5 4.5z" /></>,
+      doc: <><path d="M7 3h8l4 4v14H7z" /><path d="M15 3v4h4" /><path d="M10 13h7M10 17h5" /></>,
+      cake: <><path d="M5 13h14v7H5z" /><path d="M5 13c0-2 2-3 3-3M11 13c0-2 2-3 3-3M17 13c0-2 2-3 3-3" /><path d="M8 7v3M12 7v3M16 7v3" /></>,
+      chevR: <><path d="m9 6 6 6-6 6" /></>,
+      send: <><path d="M5 12l14-7-5 14-3-6-6-1z" /></>,
+      claim: <><path d="M4 7h16v12H4z" /><path d="M4 7l3-3h10l3 3" /><path d="M9 12h6" /></>,
+      crown: <><path d="m3 7 4 4 5-6 5 6 4-4v11H3z" /></>,
+      logout: <><path d="M10 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4" /><path d="M16 8l4 4-4 4M20 12H10" /></>,
+    };
+    return (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        {paths[name]}
+      </svg>
+    );
+  }
+
+  function StatusBar({ tone = "light" }) {
+    const c = tone === "light" ? "text-white" : "text-slate-900";
+    return (
+      <div className={`relative h-12 px-7 pt-3 flex items-center justify-between text-[13px] font-semibold ${c}`}>
+        <span>9:41</span>
+        <span className="flex items-center gap-1.5 opacity-90">
+          <svg width="16" height="10" viewBox="0 0 16 10" fill="currentColor"><rect x="0" y="6" width="3" height="4" rx="1"/><rect x="4" y="4" width="3" height="6" rx="1"/><rect x="8" y="2" width="3" height="8" rx="1"/><rect x="12" y="0" width="3" height="10" rx="1"/></svg>
+          <svg width="16" height="10" viewBox="0 0 16 10" fill="none" stroke="currentColor" strokeWidth="1.4"><path d="M1 4c2-2 5-3 7-3s5 1 7 3" /><path d="M3.5 6c1.5-1.3 3-2 4.5-2s3 .7 4.5 2" /><circle cx="8" cy="8" r="1" fill="currentColor"/></svg>
+          <svg width="22" height="10" viewBox="0 0 22 10" fill="none" stroke="currentColor" strokeWidth="1.2"><rect x="0.6" y="0.6" width="17" height="8.8" rx="2.2" /><rect x="2" y="2" width="14" height="6" rx="1.4" fill="currentColor"/><rect x="18.5" y="3.5" width="2" height="3" rx="1" fill="currentColor"/></svg>
+        </span>
+      </div>
+    );
+  }
+
+  function StatCard({ icon, label, value, tone }) {
+    const tones = {
+      blue:   { bg: "bg-blue-50",   ring: "ring-blue-100",   text: "text-blue-700"   },
+      green:  { bg: "bg-emerald-50",ring: "ring-emerald-100",text: "text-emerald-700"},
+      orange: { bg: "bg-amber-50",  ring: "ring-amber-100",  text: "text-amber-700"  },
+      purple: { bg: "bg-violet-50", ring: "ring-violet-100", text: "text-violet-700" },
+    };
+    const t = tones[tone];
+    return (
+      <div className="bg-white rounded-2xl p-4 card-shadow">
+        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${t.bg} ${t.text} ring-1 ${t.ring}`}>
+          {icon}
+        </div>
+        <div className="mt-3 text-[28px] font-semibold tracking-tight text-slate-900 leading-none">{value}</div>
+        <div className="mt-1 text-[13px] text-slate-500">{label}</div>
+      </div>
+    );
+  }
+
+  function Badge({ children, tone = "slate" }) {
+    const map = {
+      slate:  "bg-slate-100 text-slate-700",
+      ok:     "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100",
+      warn:   "bg-amber-50 text-amber-800 ring-1 ring-amber-200",
+      danger: "bg-rose-50 text-rose-700 ring-1 ring-rose-100",
+      blue:   "bg-blue-50 text-blue-700 ring-1 ring-blue-100",
+      pink:   "bg-pink-50 text-pink-700 ring-1 ring-pink-100",
+    };
+    return <span className={`inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full ${map[tone]}`}>{children}</span>;
+  }
+
+  /* =========================================================
+     SCREENS
+     ========================================================= */
+  function LoginScreen({ go }) {
+    const [email, setEmail] = useState("agent@bluesky.hk");
+    const [pass, setPass] = useState("••••••••");
+    const [focus, setFocus] = useState(null);
+    return (
+      <div className="absolute inset-0 screen-enter" style={{
+        background: "linear-gradient(160deg,#1e3a8a 0%,#1d4ed8 60%,#3b82f6 100%)",
+      }}>
+        <StatusBar tone="light" />
+        <div className="px-6 pt-6 flex items-center justify-between text-white/80 text-[12px]">
+          <span>v3.2 · Hong Kong</span>
+          <span>EN · 繁</span>
+        </div>
+
+        <div className="px-6 pt-16 text-white">
+          <div className="w-14 h-14 rounded-2xl bg-white/15 backdrop-blur flex items-center justify-center ring-1 ring-white/20">
+            <Icon name="shield" className="w-7 h-7" />
+          </div>
+          <div className="mt-5 text-[34px] font-semibold tracking-tight leading-none">InsuranceAI</div>
+          <div className="mt-2 text-white/75 text-[14px]">Hong Kong agents' AI co-pilot</div>
+        </div>
+
+        <div className="absolute left-4 right-4 bottom-6 bg-white rounded-3xl p-6 card-shadow">
+          <div className="text-[15px] font-semibold text-slate-900">登入</div>
+          <div className="text-[12px] text-slate-500 mt-0.5">使用公司電郵繼續</div>
+
+          <label className={`mt-5 block rounded-2xl border ${focus==="e"?"border-blue-500 ring-4 ring-blue-100":"border-slate-200"} px-4 py-2.5 transition`}>
+            <div className="text-[11px] text-slate-500">電郵</div>
+            <input value={email} onChange={e=>setEmail(e.target.value)} onFocus={()=>setFocus("e")} onBlur={()=>setFocus(null)}
+              className="w-full bg-transparent outline-none text-[14px] text-slate-900" />
+          </label>
+          <label className={`mt-3 block rounded-2xl border ${focus==="p"?"border-blue-500 ring-4 ring-blue-100":"border-slate-200"} px-4 py-2.5 transition`}>
+            <div className="text-[11px] text-slate-500">密碼</div>
+            <input type="password" value={pass} onChange={e=>setPass(e.target.value)} onFocus={()=>setFocus("p")} onBlur={()=>setFocus(null)}
+              className="w-full bg-transparent outline-none text-[14px] text-slate-900" />
+          </label>
+
+          <div className="flex items-center justify-between mt-3 text-[12px]">
+            <label className="flex items-center gap-2 text-slate-600"><input type="checkbox" defaultChecked className="accent-blue-600" /> 記住我</label>
+            <button className="text-blue-700 font-medium">忘記密碼？</button>
+          </div>
+
+          <button onClick={()=>go("dashboard")} className="pressable mt-4 w-full bg-blue-700 hover:bg-blue-800 text-white rounded-2xl py-3.5 text-[15px] font-semibold">登入</button>
+          <button onClick={()=>go("head")} className="pressable mt-2 w-full text-slate-600 rounded-2xl py-2 text-[12px]">以團隊主管身分登入 →</button>
+        </div>
+      </div>
+    );
+  }
+
+  function Dashboard({ go }) {
+    return (
+      <div className="absolute inset-0 screen-enter overflow-hidden">
+        <div className="bg-gradient-to-b from-blue-700 to-blue-600 text-white pb-10">
+          <StatusBar tone="light" />
+          <div className="px-5 pt-1 flex items-center justify-between">
+            <div>
+              <div className="text-white/75 text-[12px]">星期三・5月 6日</div>
+              <div className="text-[22px] font-semibold mt-0.5 leading-tight">你好，陳大文 <span>👋</span></div>
+            </div>
+            <div className="w-10 h-10 rounded-full bg-white/15 ring-1 ring-white/20 flex items-center justify-center">
+              <Icon name="bell" className="w-5 h-5" />
+            </div>
+          </div>
+          <div className="px-5 mt-4 text-[12px] text-white/80">本月業績 · <span className="text-white font-semibold">+12.4%</span> vs 上月</div>
+        </div>
+
+        <div className="px-4 -mt-6 pb-4 h-full overflow-y-auto noscroll">
+          <div className="grid grid-cols-2 gap-3">
+            <StatCard tone="blue"   icon={<Icon name="users" />}  label="我的客戶"     value="28" />
+            <StatCard tone="green"  icon={<Icon name="shield" />} label="有效保單"     value="45" />
+            <StatCard tone="orange" icon={<Icon name="claim" />}  label="待處理 Claim" value="3"  />
+            <StatCard tone="purple" icon={<Icon name="bell" />}   label="待辦提醒"     value="5"  />
+          </div>
+
+          <button onClick={()=>go("reminders")} className="pressable mt-4 w-full text-left bg-pink-50 ring-1 ring-pink-100 rounded-2xl p-4 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-pink-100 text-pink-700 flex items-center justify-center"><Icon name="cake" /></div>
+            <div className="flex-1">
+              <div className="text-[11px] uppercase tracking-wide text-pink-700/80 font-semibold">生日提醒</div>
+              <div className="text-[14px] text-slate-900 font-medium">李小明 — 今日 🎉</div>
+              <div className="text-[12px] text-slate-500">建議寄送祝福 + 年度保障檢視邀請</div>
+            </div>
+            <Icon name="chevR" className="w-4 h-4 text-pink-700/60" />
+          </button>
+
+          <div className="mt-4 grid grid-cols-2 gap-3">
+            <button onClick={()=>go("clients")} className="pressable bg-blue-700 text-white rounded-2xl py-3.5 text-[14px] font-semibold flex items-center justify-center gap-2">
+              <Icon name="plus" className="w-4 h-4" /> 新增客戶
+            </button>
+            <button onClick={()=>go("ai")} className="pressable bg-slate-900 text-white rounded-2xl py-3.5 text-[14px] font-semibold flex items-center justify-center gap-2">
+              <Icon name="sparkle" className="w-4 h-4" /> AI助手
+            </button>
+          </div>
+
+          <div className="mt-5">
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-[13px] font-semibold text-slate-900">今日重點</div>
+              <button onClick={()=>go("reminders")} className="text-[12px] text-blue-700">查看全部</button>
+            </div>
+            <div className="bg-white rounded-2xl card-shadow divide-y divide-slate-100">
+              <FocusRow tone="rose"   icon="shield" title="陳大文危疾保單即將到期" sub="HA-2020-11234 · 30日內" cta="跟進" onClick={()=>go("client","c1")} />
+              <FocusRow tone="blue"   icon="phone"  title="跟進張偉明年金計劃"   sub="上次接觸 4日前"        cta="致電" onClick={()=>go("client","c4")} />
+              <FocusRow tone="violet" icon="doc"    title="李小明住院 Claim 文件"  sub="待客戶提供住院紙"       cta="檢視" onClick={()=>go("client","c2")} />
+            </div>
+          </div>
+
+          <div className="mt-5 bg-white rounded-2xl p-4 card-shadow">
+            <div className="text-[13px] font-semibold text-slate-900">本月銷售漏斗</div>
+            <div className="mt-3 space-y-2">
+              <FunnelBar label="新接觸" value={42} max={42} color="bg-blue-200" />
+              <FunnelBar label="已會面" value={23} max={42} color="bg-blue-400" />
+              <FunnelBar label="已建議" value={11} max={42} color="bg-blue-600" />
+              <FunnelBar label="已成交" value={4}  max={42} color="bg-blue-800" />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  function FocusRow({ tone, icon, title, sub, cta, onClick }) {
+    const tones = {
+      rose:   "bg-rose-50 text-rose-700",
+      blue:   "bg-blue-50 text-blue-700",
+      violet: "bg-violet-50 text-violet-700",
+    };
+    return (
+      <button onClick={onClick} className="pressable w-full flex items-center gap-3 p-3 text-left">
+        <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${tones[tone]}`}><Icon name={icon} className="w-4 h-4" /></div>
+        <div className="flex-1 min-w-0">
+          <div className="text-[13.5px] font-medium text-slate-900 truncate">{title}</div>
+          <div className="text-[11.5px] text-slate-500 truncate">{sub}</div>
+        </div>
+        <span className="text-[11.5px] font-semibold text-blue-700">{cta}</span>
+      </button>
+    );
+  }
+
+  function FunnelBar({ label, value, max, color }) {
+    const pct = Math.round((value/max)*100);
+    return (
+      <div>
+        <div className="flex justify-between text-[11.5px] text-slate-500"><span>{label}</span><span className="text-slate-700 font-medium">{value}</span></div>
+        <div className="h-2 bg-slate-100 rounded-full overflow-hidden mt-1">
+          <div className={`h-full ${color}`} style={{ width: pct+"%" }} />
+        </div>
+      </div>
+    );
+  }
+
+  /* ----- Clients list ----- */
+  function ClientsScreen({ go }) {
+    const [q, setQ] = useState("");
+    const list = useMemo(() => CLIENTS.filter(c =>
+      !q || c.nameZh.includes(q) || c.nameEn.toLowerCase().includes(q.toLowerCase())
+    ), [q]);
+    return (
+      <div className="absolute inset-0 screen-enter overflow-hidden">
+        <div className="bg-white">
+          <StatusBar tone="dark" />
+          <div className="px-5 py-3 flex items-center justify-between">
+            <div className="text-[20px] font-semibold tracking-tight text-slate-900">我的客戶</div>
+            <button className="pressable bg-blue-700 text-white text-[12.5px] font-semibold rounded-full px-3.5 py-1.5 flex items-center gap-1">
+              <Icon name="plus" className="w-3.5 h-3.5" /> 新增
+            </button>
+          </div>
+          <div className="px-5 pb-3">
+            <div className="flex items-center gap-2 bg-slate-100 rounded-xl px-3 py-2.5">
+              <Icon name="search" className="w-4 h-4 text-slate-500" />
+              <input value={q} onChange={e=>setQ(e.target.value)} placeholder="搜尋姓名 / 公司 / 保單號碼" className="bg-transparent w-full outline-none text-[13.5px]" />
+            </div>
+          </div>
+          <div className="px-5 pb-3 flex gap-2 overflow-x-auto noscroll">
+            {["全部 · 28","🎂 生日","到期保單","新接觸","VIP"].map((t,i)=>(
+              <button key={i} className={`pressable shrink-0 text-[12px] font-medium px-3 py-1.5 rounded-full ${i===0?"bg-slate-900 text-white":"bg-slate-100 text-slate-700"}`}>{t}</button>
+            ))}
+          </div>
+        </div>
+
+        <div className="h-px bg-slate-100" />
+
+        <div className="px-4 py-3 pb-4 h-full overflow-y-auto noscroll bg-slate-50">
+          <div className="text-[11px] uppercase tracking-wider text-slate-500 px-1 mb-2">{list.length} 位客戶</div>
+          <div className="space-y-2">
+            {list.map(c=>(
+              <button key={c.id} onClick={()=>go("client", c.id)} className="pressable w-full text-left bg-white rounded-2xl p-3 card-shadow flex items-center gap-3">
+                <div className={`w-12 h-12 rounded-2xl ${c.avatarColor} flex items-center justify-center text-[22px]`}>{c.avatar}</div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[15px] font-semibold text-slate-900">{c.nameZh}</span>
+                    {c.birthday && <span className="text-[12px]">🎂</span>}
+                    <span className="text-[12px] text-slate-500">· {c.nameEn}</span>
+                  </div>
+                  <div className="text-[12px] text-slate-500">{c.occupation} · {c.phone}</div>
+                </div>
+                <Badge tone="blue">{c.policies.length} 份</Badge>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  /* ----- Client detail ----- */
+  function ClientDetail({ go, clientId, back }) {
+    const c = CLIENTS.find(x => x.id === clientId) || CLIENTS[0];
+    return (
+      <div className="absolute inset-0 screen-enter overflow-hidden">
+        <div className="bg-blue-700 text-white">
+          <StatusBar tone="light" />
+          <div className="px-3 py-2 flex items-center gap-1">
+            <button onClick={back} className="pressable w-9 h-9 rounded-full hover:bg-white/10 flex items-center justify-center"><Icon name="back" /></button>
+            <div className="flex-1 text-center text-[14.5px] font-semibold">{c.nameZh}</div>
+            <button className="w-9 h-9 rounded-full hover:bg-white/10 flex items-center justify-center"><Icon name="phone" /></button>
+          </div>
+          <div className="px-5 pb-5 pt-1 flex items-center gap-3">
+            <div className={`w-14 h-14 rounded-2xl ${c.avatarColor} flex items-center justify-center text-[26px] ring-2 ring-white/30`}>{c.avatar}</div>
+            <div className="flex-1">
+              <div className="text-[20px] font-semibold leading-tight">{c.nameZh} <span className="text-[13px] font-normal text-white/80">· {c.nameEn}</span></div>
+              <div className="text-[12px] text-white/80">{c.occupation} · {c.phone}</div>
+            </div>
+            <Badge tone="blue">{c.policies.length} 份</Badge>
+          </div>
+        </div>
+
+        <div className="px-4 -mt-3 pb-4 h-full overflow-y-auto noscroll">
+          <div className="bg-white rounded-2xl p-4 card-shadow">
+            <div className="flex items-center justify-between">
+              <div className="text-[13.5px] font-semibold text-slate-900">個人資料</div>
+              <button className="text-[11.5px] text-blue-700 font-medium">編輯</button>
+            </div>
+            <div className="grid grid-cols-2 gap-x-3 gap-y-3 mt-3">
+              <KV k="English Name" v={c.nameEn} />
+              <KV k="年齡"          v={c.age + " 歲"} />
+              <KV k="電話"          v={c.phone} />
+              <KV k="職業"          v={c.occupation} />
+            </div>
+            <div className="mt-3 rounded-xl bg-slate-50 px-3 py-2.5">
+              <div className="text-[11px] text-slate-500">年薪</div>
+              <div className="text-[16px] font-semibold text-slate-900 tracking-tight">{c.income}</div>
+            </div>
+            <div className="mt-3">
+              <div className="text-[11px] text-slate-500">家庭狀況</div>
+              <div className="text-[12.5px] text-slate-700 mt-0.5 leading-relaxed">{c.family}</div>
+            </div>
+            <div className="mt-3">
+              <div className="text-[11px] text-slate-500">資產備註</div>
+              <div className="text-[12.5px] text-slate-700 mt-0.5 leading-relaxed">{c.assets}</div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl p-4 card-shadow mt-3">
+            <div className="flex items-center justify-between">
+              <div className="text-[13.5px] font-semibold text-slate-900">保單（{c.policies.length} 份）</div>
+              <button className="pressable w-7 h-7 rounded-full bg-blue-50 text-blue-700 flex items-center justify-center"><Icon name="plus" className="w-4 h-4" /></button>
+            </div>
+            <div className="mt-2 divide-y divide-slate-100">
+              {c.policies.map((p,i)=>(
+                <div key={i} className="py-3 first:pt-2 last:pb-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="text-[13.5px] font-medium text-slate-900 truncate">{p.name}</div>
+                      <div className="text-[11.5px] text-slate-500 truncate">{p.company} · {p.number}</div>
+                    </div>
+                    {p.statusTone === "warn"
+                      ? <Badge tone="warn">⚠️ {p.status}</Badge>
+                      : <Badge tone="ok">{p.status}</Badge>}
+                  </div>
+                  <div className="mt-2 flex items-center justify-between text-[11.5px] text-slate-500">
+                    <span>保費 <span className="text-slate-800 font-medium">{p.premium}</span></span>
+                    <span>到期 <span className="text-slate-800 font-medium">{p.expiry}</span></span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <button onClick={()=>go("ai", c.id)} className="pressable mt-3 w-full bg-blue-700 text-white rounded-2xl py-3.5 text-[14.5px] font-semibold flex items-center justify-center gap-2">
+            <Icon name="sparkle" className="w-4 h-4" /> AI銷售建議
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  function KV({ k, v }) {
+    return (
+      <div>
+        <div className="text-[11px] text-slate-500">{k}</div>
+        <div className="text-[13px] text-slate-900 font-medium">{v}</div>
+      </div>
+    );
+  }
+
+  /* ----- AI Assistant ----- */
+  const SEED_MESSAGES = [
+    { role: "ai", text: "你好！我係你嘅 AI 助手，可以幫你：\n• 分析客戶保障缺口\n• 草擬 WhatsApp 跟進訊息\n• 解釋條款 / Claim 流程\n• 計算保費及產品比較\n\n試吓問我啦 👇" },
+    { role: "user", text: "幫我分析陳大文嘅保障缺口" },
+    { role: "ai", kind: "gap" },
+    { role: "user", text: "住院 Claim 要咩文件？" },
+    { role: "ai", kind: "claim" },
+  ];
+
+  const SUGGESTIONS = ["建議王美麗加危疾", "Draft WhatsApp 跟進", "比較三大醫療計劃"];
+
+  function AIScreen({ contextId, back }) {
+    const c = CLIENTS.find(x => x.id === contextId);
+    const [msgs, setMsgs] = useState(SEED_MESSAGES);
+    const [draft, setDraft] = useState("");
+    const [typing, setTyping] = useState(false);
+    const scrollerRef = useRef(null);
+
+    useEffect(() => {
+      const el = scrollerRef.current;
+      if (el) el.scrollTop = el.scrollHeight;
+    }, [msgs, typing]);
+
+    function send(text) {
+      if (!text.trim()) return;
+      setMsgs(m => [...m, { role: "user", text }]);
+      setDraft("");
+      setTyping(true);
+      setTimeout(() => {
+        setTyping(false);
+        setMsgs(m => [...m, { role: "ai", text: synthReply(text, c) }]);
+      }, 1100);
+    }
+
+    return (
+      <div className="absolute inset-0 screen-enter flex flex-col bg-slate-50">
+        <div className="bg-white border-b border-slate-100">
+          <StatusBar tone="dark" />
+          <div className="px-3 pb-3 pt-1 flex items-center gap-2">
+            <button onClick={back} className="pressable w-9 h-9 rounded-full hover:bg-slate-100 text-slate-700 flex items-center justify-center" aria-label="返回"><Icon name="back" /></button>
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-500 to-blue-600 text-white flex items-center justify-center"><Icon name="sparkle" className="w-5 h-5" /></div>
+            <div className="flex-1 min-w-0">
+              <div className="text-[15.5px] font-semibold text-slate-900 flex items-center gap-1.5">AI助手 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span></div>
+              <div className="text-[11.5px] text-slate-500 truncate">由 Claude 驅動 · {c ? `對話中：${c.nameZh}` : "一般助理"}</div>
+            </div>
+          </div>
+        </div>
+
+        <div ref={scrollerRef} className="flex-1 overflow-y-auto noscroll px-4 py-4 space-y-3">
+          {msgs.map((m, i) => <Bubble key={i} m={m} client={c} />)}
+          {typing && (
+            <div className="flex">
+              <div className="bg-white rounded-2xl rounded-tl-md px-4 py-3 card-shadow flex items-center gap-1.5">
+                <span className="dot w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                <span className="dot w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                <span className="dot w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="px-3 pb-2 pt-1 flex gap-2 overflow-x-auto noscroll bg-white">
+          {SUGGESTIONS.map((s,i)=>(
+            <button key={i} onClick={()=>send(s)} className="pressable shrink-0 text-[11.5px] text-slate-700 bg-slate-50 border border-slate-200 rounded-full px-3 py-1.5">{s}</button>
+          ))}
+        </div>
+
+        <div className="px-3 pb-3 pt-1 bg-white border-t border-slate-100">
+          <div className="flex items-end gap-2">
+            <div className="flex-1 bg-slate-100 rounded-2xl px-3 py-2.5">
+              <textarea
+                rows={1}
+                value={draft}
+                onChange={e=>setDraft(e.target.value)}
+                onKeyDown={e=>{ if(e.key==="Enter" && !e.shiftKey){ e.preventDefault(); send(draft);} }}
+                placeholder="問 AI 任何嘢…"
+                className="w-full bg-transparent outline-none text-[13.5px] resize-none"
+              />
+            </div>
+            <button onClick={()=>send(draft)} className="pressable w-10 h-10 rounded-2xl bg-blue-700 text-white flex items-center justify-center">
+              <Icon name="send" />
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  function Bubble({ m, client }) {
+    if (m.role === "user") {
+      return (
+        <div className="flex justify-end">
+          <div className="max-w-[78%] bg-blue-700 text-white rounded-2xl rounded-tr-md px-3.5 py-2.5 text-[13.5px] leading-relaxed whitespace-pre-line">{m.text}</div>
+        </div>
+      );
+    }
+    if (m.kind === "gap") {
+      return (
+        <div className="flex">
+          <div className="max-w-[88%] bg-white rounded-2xl rounded-tl-md p-3.5 text-[13px] text-slate-800 card-shadow">
+            <div className="font-semibold text-slate-900 mb-1.5">{client?.nameZh || "陳大文"} 保障缺口分析</div>
+            <div className="text-[11.5px] text-slate-500 mb-2">基於年齡 38、年薪 HK$850,000、家庭狀況（兩名子女）</div>
+
+            <Block title="✅ 已有保障" tone="ok" items={[
+              "終身人壽 · 保額 HK$2.5M",
+              "醫療住院（半私家房）",
+              "危疾保障 · HK$1M",
+            ]} />
+            <Block title="⚠️ 主要缺口" tone="warn" items={[
+              "人壽保額不足：建議 10× 年薪 ≈ HK$8.5M（現時 30%）",
+              "未有意外保障 / 收入失能保障",
+              "子女教育金尚未規劃",
+            ]} />
+            <Block title="💡 建議" tone="blue" items={[
+              "加保定期人壽 HK$5M（保費約 HK$11,200/年）",
+              "教育儲蓄計劃，月供 HK$5,000，18 年期",
+              "Top-up 危疾至 HK$2M，覆蓋早期癌症",
+            ]} />
+            <button className="pressable mt-2 text-[11.5px] font-semibold text-blue-700">產生 WhatsApp 跟進稿 →</button>
+          </div>
+        </div>
+      );
+    }
+    if (m.kind === "claim") {
+      return (
+        <div className="flex">
+          <div className="max-w-[88%] bg-white rounded-2xl rounded-tl-md p-3.5 text-[13px] text-slate-800 card-shadow">
+            <div className="font-semibold text-slate-900 mb-1.5">住院 Claim 文件清單</div>
+            <ol className="space-y-1.5 list-decimal pl-4 marker:text-slate-400">
+              <li>已填妥之住院索償申請書（保單持有人簽署）</li>
+              <li>醫生報告 / 出院摘要 (Discharge Summary) 正本</li>
+              <li>住院費用收據正本（必須有醫院蓋印）</li>
+              <li>檢驗 / X-ray / 化驗報告</li>
+              <li>身份證副本 + 銀行存摺首頁</li>
+              <li>如轉介私家：原醫生轉介信</li>
+            </ol>
+            <div className="mt-2 text-[11.5px] text-slate-500">處理時間：齊文件後一般 7–10 個工作天</div>
+          </div>
+        </div>
+      );
+    }
+    return (
+      <div className="flex">
+        <div className="max-w-[82%] bg-white rounded-2xl rounded-tl-md px-3.5 py-2.5 text-[13.5px] leading-relaxed text-slate-800 card-shadow whitespace-pre-line">{m.text}</div>
+      </div>
+    );
+  }
+
+  function Block({ title, tone, items }) {
+    const tones = { ok: "bg-emerald-50 text-emerald-800", warn: "bg-amber-50 text-amber-800", blue: "bg-blue-50 text-blue-800" };
+    return (
+      <div className={`mt-1.5 rounded-xl px-3 py-2 ${tones[tone]}`}>
+        <div className="text-[11.5px] font-semibold mb-1">{title}</div>
+        <ul className="space-y-0.5 text-[12px] leading-relaxed">
+          {items.map((it,i)=>(<li key={i} className="text-slate-800/90">• {it}</li>))}
+        </ul>
+      </div>
+    );
+  }
+
+  function synthReply(q, client) {
+    const lower = q.toLowerCase();
+    if (lower.includes("whatsapp") || q.includes("跟進")) {
+      return "好的，這是建議稿：\n\n陳生你好，最近留意到您的危疾保單將於 6 月 4 日到期。我想約您本週四下午 3:00 到您公司附近 30 分鐘簡單檢視一下保障，幫您看看是否需要調整。請問方便嗎？— 陳大文（藍天人壽）";
+    }
+    if (q.includes("王美麗") || q.includes("危疾")) {
+      return "王美麗 42 歲、年薪 HK$1.1M、無子女但有兩個物業。建議：\n• 加保危疾至 HK$3M（多次賠付型）\n• 強調早期癌症 / 中風保障，保費約 HK$28,400/年\n• 配合年金延後啟領至 65 歲";
+    }
+    if (q.includes("醫療") || q.includes("比較")) {
+      return "三大醫療計劃比較：\n• 藍天 Premier：私家房 + 全球，年保費 ~$32k\n• 恒安 SmartCare：半私家，年保費 ~$14k\n• 環球互助 Flexi：可調自付，~$9k 起\n要我準備 PDF 比較表嗎？";
+    }
+    return "明白，等我整理一下相關資料。需要我同時為這位客戶建議下一步行動嗎？";
+  }
+
+  /* ----- Reminders ----- */
+  function RemindersScreen({ go }) {
+    return (
+      <div className="absolute inset-0 screen-enter overflow-hidden">
+        <div className="bg-white">
+          <StatusBar tone="dark" />
+          <div className="px-5 py-3 flex items-center justify-between">
+            <div className="text-[20px] font-semibold tracking-tight text-slate-900">提醒</div>
+            <button className="text-[12px] text-blue-700 font-medium">標記全部已讀</button>
+          </div>
+        </div>
+        <div className="h-px bg-slate-100" />
+        <div className="px-4 py-4 pb-4 h-full overflow-y-auto noscroll bg-slate-50">
+
+          <div className="text-[11px] uppercase tracking-wider text-slate-500 px-1 mb-2">🎂 30日內生日</div>
+          <div className="space-y-2">
+            <BirthdayCard onClick={()=>go("client","c2")} name="李小明" sub="34歲 · 中學教師" tag="今日 🎉" tone="hot" />
+            <BirthdayCard onClick={()=>go("client","c3")} name="王美麗" sub="42歲 · 市場主管" tag="3日後" tone="soon" />
+          </div>
+
+          <div className="text-[11px] uppercase tracking-wider text-slate-500 px-1 mt-5 mb-2">🔔 待辦提醒</div>
+          <div className="bg-white rounded-2xl card-shadow divide-y divide-slate-100">
+            <ReminderRow tone="rose"   icon="shield" title="陳大文危疾保單即將到期"   sub="陳大文 · 2026-06-04"    onClick={()=>go("client","c1")} />
+            <ReminderRow tone="blue"   icon="phone"  title="跟進張偉明年金計劃"     sub="張偉明 · 上次接觸 4日前" onClick={()=>go("client","c4")} />
+            <ReminderRow tone="violet" icon="doc"    title="李小明住院 Claim 文件補交" sub="李小明 · 5月8日截止"    onClick={()=>go("client","c2")} />
+            <ReminderRow tone="amber"  icon="users"  title="王美麗年度檢視會面"     sub="王美麗 · 5月10日 14:00"  onClick={()=>go("client","c3")} />
+            <ReminderRow tone="emerald" icon="sparkle" title="生成本週銷售簡報"      sub="自動 AI 報告 · 5月10日"  onClick={()=>go("ai")} />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  function BirthdayCard({ name, sub, tag, tone, onClick }) {
+    const tones = {
+      hot:  "from-pink-100 to-rose-50 ring-pink-200",
+      soon: "from-pink-50 to-pink-50 ring-pink-100",
+    };
+    return (
+      <button onClick={onClick} className={`pressable w-full text-left bg-gradient-to-br ${tones[tone]} ring-1 rounded-2xl p-3.5 flex items-center gap-3`}>
+        <div className="w-11 h-11 rounded-2xl bg-white text-pink-600 flex items-center justify-center text-[22px]">🎂</div>
+        <div className="flex-1">
+          <div className="text-[14px] font-semibold text-slate-900">{name}</div>
+          <div className="text-[11.5px] text-slate-500">{sub}</div>
+        </div>
+        <Badge tone="pink">{tag}</Badge>
+      </button>
+    );
+  }
+
+  function ReminderRow({ tone, icon, title, sub, onClick }) {
+    const tones = {
+      rose:    "bg-rose-50 text-rose-700",
+      blue:    "bg-blue-50 text-blue-700",
+      violet:  "bg-violet-50 text-violet-700",
+      amber:   "bg-amber-50 text-amber-700",
+      emerald: "bg-emerald-50 text-emerald-700",
+    };
+    const titleTone = tone === "rose" ? "text-rose-700" : tone === "blue" ? "text-blue-700" : "text-slate-900";
+    return (
+      <button onClick={onClick} className="pressable w-full p-3.5 flex items-center gap-3 text-left">
+        <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${tones[tone]}`}><Icon name={icon} className="w-4 h-4" /></div>
+        <div className="flex-1 min-w-0">
+          <div className={`text-[13.5px] font-semibold truncate ${titleTone}`}>{title}</div>
+          <div className="text-[11.5px] text-slate-500 truncate">{sub}</div>
+        </div>
+        <Icon name="chevR" className="w-4 h-4 text-slate-400" />
+      </button>
+    );
+  }
+
+  /* ----- Head Dashboard ----- */
+  function HeadScreen({ go }) {
+    return (
+      <div className="absolute inset-0 screen-enter overflow-hidden">
+        <div className="bg-slate-900 text-white pb-10">
+          <StatusBar tone="light" />
+          <div className="px-5 pt-1 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-300 ring-1 ring-amber-500/30 flex items-center justify-center"><Icon name="crown" /></div>
+              <div>
+                <div className="text-[11.5px] text-white/60">Team Lead 視圖</div>
+                <div className="text-[18px] font-semibold leading-tight">Team 總覽</div>
+              </div>
+            </div>
+            <button onClick={()=>go("dashboard")} className="text-[11.5px] text-white/80 bg-white/10 ring-1 ring-white/15 px-3 py-1.5 rounded-full">切換 Agent 視圖</button>
+          </div>
+
+          <div className="px-5 mt-5 grid grid-cols-3 gap-3">
+            <Stat tone="dark" value="156" label="總客戶" sub="+8 本月" />
+            <Stat tone="dark" value="284" label="有效保單" sub="+22 本月" />
+            <Stat tone="dark" value="12"  label="待 Claim" sub="3 緊急" />
+          </div>
+        </div>
+
+        <div className="px-4 -mt-6 pb-4 h-full overflow-y-auto noscroll">
+          <div className="bg-white rounded-2xl card-shadow p-3">
+            <div className="flex items-center justify-between px-1">
+              <div className="text-[13.5px] font-semibold text-slate-900">Agent 表現</div>
+              <button className="text-[11.5px] text-blue-700 font-medium">本月 ▾</button>
+            </div>
+            <div className="mt-2 grid grid-cols-12 text-[10.5px] uppercase tracking-wider text-slate-400 px-2 pb-1.5 border-b border-slate-100">
+              <div className="col-span-5">Agent</div>
+              <div className="col-span-2 text-right">客戶</div>
+              <div className="col-span-2 text-right">保單</div>
+              <div className="col-span-3 text-right">Claim</div>
+            </div>
+            <div className="divide-y divide-slate-100">
+              {TEAM.map((t,i)=>(
+                <div key={i} className={`grid grid-cols-12 items-center px-2 py-2.5 text-[13px] ${t.highlight?"bg-blue-50/40":""}`}>
+                  <div className="col-span-5 flex items-center gap-2 min-w-0">
+                    <div className={`w-7 h-7 rounded-full ${t.highlight?"bg-blue-600 text-white":"bg-slate-100 text-slate-700"} flex items-center justify-center text-[11px] font-semibold`}>
+                      {t.name.split(" ").map(s=>s[0]).join("").slice(0,2).toUpperCase()}
+                    </div>
+                    <span className={`truncate ${t.highlight?"font-semibold text-slate-900":"text-slate-800"}`}>{t.name}</span>
+                  </div>
+                  <div className="col-span-2 text-right text-slate-700">👤 {t.clients}</div>
+                  <div className="col-span-2 text-right text-slate-700">📋 {t.policies}</div>
+                  <div className="col-span-3 text-right">
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold ${t.alert?"bg-amber-100 text-amber-800":"bg-slate-100 text-slate-700"}`}>
+                      🏥 {t.claims}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-3 bg-amber-50 ring-1 ring-amber-200 rounded-2xl p-4">
+            <div className="flex items-center gap-2">
+              <span className="text-amber-700">⚠️</span>
+              <div className="text-[13.5px] font-semibold text-amber-900">30日內到期保單</div>
+              <span className="ml-auto text-[11px] text-amber-800/80">{EXPIRING.length} 份</span>
+            </div>
+            <div className="mt-2 divide-y divide-amber-200/70">
+              {EXPIRING.map((x,i)=>(
+                <div key={i} className="py-2 flex items-center gap-2 text-[12.5px]">
+                  <div className="w-7 h-7 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center text-[11px] font-semibold">{x.days}d</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-slate-900 font-medium truncate">{x.client}</div>
+                    <div className="text-amber-900/70 truncate">{x.policy}</div>
+                  </div>
+                  <button className="text-[11.5px] font-semibold text-amber-900">指派 →</button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-3 bg-white rounded-2xl card-shadow p-4">
+            <div className="text-[13.5px] font-semibold text-slate-900">本月團隊 GWP</div>
+            <div className="mt-1 flex items-end gap-2">
+              <div className="text-[28px] font-semibold tracking-tight text-slate-900 leading-none">HK$4.82M</div>
+              <span className="text-[12px] font-semibold text-emerald-700">+18% MoM</span>
+            </div>
+            <div className="mt-3 h-20 flex items-end gap-1.5">
+              {[34,42,30,55,48,62,71,58,66,74,80,92].map((v,i)=>(
+                <div key={i} className="flex-1 rounded-md bg-blue-600/80" style={{ height: v+"%", opacity: 0.4 + i*0.05 }} />
+              ))}
+            </div>
+            <div className="mt-1 flex justify-between text-[10px] text-slate-400">
+              <span>1月</span><span>3月</span><span>6月</span><span>9月</span><span>12月</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  function Stat({ value, label, sub, tone }) {
+    return (
+      <div className="bg-white/5 ring-1 ring-white/10 rounded-2xl p-3">
+        <div className="text-[24px] font-semibold tracking-tight leading-none">{value}</div>
+        <div className="text-[11.5px] text-white/70 mt-1">{label}</div>
+        <div className="text-[10.5px] text-emerald-300 mt-1">{sub}</div>
+      </div>
+    );
+  }
+
+  /* ----- Bottom nav ----- */
+  function BottomNav({ active, go }) {
+    const items = [
+      { id: "dashboard", label: "主頁",   icon: "home"    },
+      { id: "clients",   label: "客戶",   icon: "users"   },
+      { id: "policies",  label: "保單",   icon: "shield"  },
+      { id: "reminders", label: "提醒",   icon: "bell"    },
+      { id: "ai",        label: "AI",     icon: "sparkle" },
+    ];
+    return (
+      <div className="shrink-0 bg-white border-t border-slate-200 z-30">
+        <div className="flex items-center px-1 pt-1">
+          {items.map(it => {
+            const isActive = active === it.id;
+            return (
+              <button key={it.id} onClick={()=>go(it.id)} className="pressable flex-1 py-2 flex flex-col items-center gap-0.5">
+                <div className={`w-9 h-9 rounded-2xl flex items-center justify-center ${isActive?"bg-blue-700 text-white":"text-slate-500"}`}>
+                  <Icon name={it.icon} className="w-[18px] h-[18px]" />
+                </div>
+                <div className={`text-[10.5px] ${isActive?"text-blue-700 font-semibold":"text-slate-500"}`}>{it.label}</div>
+              </button>
+            );
+          })}
+        </div>
+        <div className="h-1.5 w-32 bg-black/80 rounded-full mx-auto my-1.5"></div>
+      </div>
+    );
+  }
+
+  /* ----- Policies (bonus, accessible via nav) ----- */
+  function PoliciesScreen({ go }) {
+    const all = CLIENTS.flatMap(c => c.policies.map(p => ({ ...p, client: c.nameZh, clientId: c.id })));
+    return (
+      <div className="absolute inset-0 screen-enter overflow-hidden">
+        <div className="bg-white">
+          <StatusBar tone="dark" />
+          <div className="px-5 py-3">
+            <div className="text-[20px] font-semibold tracking-tight text-slate-900">保單</div>
+            <div className="text-[12px] text-slate-500">總共 {all.length} 份 · 1 份即將到期</div>
+          </div>
+          <div className="px-5 pb-3 flex gap-2 overflow-x-auto noscroll">
+            {["全部","醫療","危疾","人壽","年金","到期"].map((t,i)=>(
+              <button key={i} className={`pressable shrink-0 text-[12px] font-medium px-3 py-1.5 rounded-full ${i===0?"bg-slate-900 text-white":"bg-slate-100 text-slate-700"}`}>{t}</button>
+            ))}
+          </div>
+        </div>
+        <div className="h-px bg-slate-100" />
+        <div className="px-4 py-3 pb-4 h-full overflow-y-auto noscroll bg-slate-50 space-y-2">
+          {all.map((p,i)=>(
+            <button key={i} onClick={()=>go("client", p.clientId)} className="pressable w-full text-left bg-white rounded-2xl p-3.5 card-shadow">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="text-[14px] font-semibold text-slate-900 truncate">{p.name}</div>
+                  <div className="text-[11.5px] text-slate-500 truncate">{p.client} · {p.company} · {p.number}</div>
+                </div>
+                {p.statusTone === "warn"
+                  ? <Badge tone="warn">⚠️ {p.status}</Badge>
+                  : <Badge tone="ok">{p.status}</Badge>}
+              </div>
+              <div className="mt-2 flex items-center justify-between text-[11.5px] text-slate-500">
+                <span>保費 <span className="text-slate-800 font-medium">{p.premium}</span></span>
+                <span>到期 <span className="text-slate-800 font-medium">{p.expiry}</span></span>
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  /* =========================================================
+     APP / ROUTER
+     ========================================================= */
+  const SCREEN_LABELS = [
+    { id: "login",     label: "登入",        ui: "login" },
+    { id: "dashboard", label: "主頁",        ui: "dashboard" },
+    { id: "clients",   label: "客戶列表",    ui: "clients" },
+    { id: "client",    label: "客戶詳情",    ui: "clients", arg: "c1" },
+    { id: "policies",  label: "保單",        ui: "policies" },
+    { id: "ai",        label: "AI 助手",     ui: "ai" },
+    { id: "reminders", label: "提醒",        ui: "reminders" },
+    { id: "head",      label: "Team 主管",   ui: "head" },
+  ];
+
+  function App() {
+    const [screen, setScreen] = useState("login");      // current rendered screen
+    const [clientId, setClientId] = useState(null);
+    const [aiContext, setAiContext] = useState(null);
+    const [stack, setStack] = useState([]);             // simple back stack
+
+    function go(target, arg) {
+      setStack(s => screen ? [...s, { screen, clientId, aiContext }] : s);
+      if (target === "client") { setClientId(arg || "c1"); }
+      if (target === "ai")     { setAiContext(arg || null); }
+      setScreen(target);
+    }
+
+    function back() {
+      setStack(s => {
+        if (s.length === 0) { setScreen("dashboard"); return s; }
+        const prev = s[s.length - 1];
+        setScreen(prev.screen);
+        setClientId(prev.clientId);
+        setAiContext(prev.aiContext);
+        return s.slice(0, -1);
+      });
+    }
+
+    function jump(target) {
+      // Jump from demo tabs — reset stack to that screen
+      setStack([]);
+      if (target === "client") setClientId("c1");
+      setScreen(target);
+    }
+
+    const showsBottomNav = ["dashboard","clients","policies","reminders"].includes(screen);
+    const navActive = ["dashboard","clients","policies","ai","reminders"].includes(screen) ? screen : null;
+
+    return (
+      <div className="min-h-screen flex flex-col items-center pt-6 pb-12 px-4">
+        {/* Demo tab strip */}
+        <div className="w-full max-w-[860px] mb-5">
+          <div className="flex items-center justify-between mb-2">
+            <div>
+              <div className="text-[11px] tracking-[0.18em] uppercase text-slate-500 font-semibold">Prototype · InsuranceAI</div>
+              <div className="text-[15px] text-slate-900 font-semibold">CRM 助手 — Hong Kong agents</div>
+            </div>
+            <div className="text-[11px] text-slate-500">Demo navigation — click any screen</div>
+          </div>
+          <div className="bg-white/70 backdrop-blur ring-1 ring-slate-200 rounded-2xl p-1 flex flex-wrap gap-1">
+            {SCREEN_LABELS.map(s => {
+              const active = (s.id === "client" && screen === "client") || (s.id !== "client" && screen === s.id);
+              return (
+                <button key={s.id}
+                  onClick={()=>jump(s.id)}
+                  className={`demo-tab pressable text-[12px] font-medium px-3 py-1.5 rounded-xl ${active?"active":"text-slate-700 hover:bg-slate-100"}`}>
+                  {s.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Phone */}
+        <div className="phone-bezel relative">
+          <div className="phone-screen">
+            <div className="notch"></div>
+
+            <div className="screen-frame">
+              {screen === "login"     && <LoginScreen go={go} />}
+              {screen === "dashboard" && <Dashboard go={go} />}
+              {screen === "clients"   && <ClientsScreen go={go} />}
+              {screen === "client"    && <ClientDetail go={go} clientId={clientId} back={back} />}
+              {screen === "policies"  && <PoliciesScreen go={go} />}
+              {screen === "ai"        && <AIScreen contextId={aiContext} back={()=>{ setStack([]); setScreen("dashboard"); }} />}
+              {screen === "reminders" && <RemindersScreen go={go} />}
+              {screen === "head"      && <HeadScreen go={go} />}
+            </div>
+
+            {showsBottomNav && <BottomNav active={navActive} go={jump} />}
+          </div>
+        </div>
+
+        <div className="text-[11px] text-slate-500 mt-4">
+          Tip: navigate via the tabs above, the bottom nav, or in-screen buttons. Back arrow on detail screens.
+        </div>
+      </div>
+    );
+  }
+
+  ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>
