@@ -45,7 +45,21 @@ type ParsePolicyResponse = {
   fields?: Partial<Record<keyof PolicyFields, string | number | null>>;
   chunks_processed?: number;
   truncated?: boolean;
+  scanned_pages_processed?: number;
+  local_rules?: boolean;
   error?: string;
+};
+
+type PolicyScanImage = {
+  page: number;
+  base64: string;
+  mediaType: 'image/jpeg';
+};
+
+type ExtractedPolicyPdf = {
+  text: string;
+  scannedImages: PolicyScanImage[];
+  totalPages: number;
 };
 
 const MAX_POLICY_TEXT_CHARS = 220_000;
@@ -201,19 +215,29 @@ export function NewPolicyForm({
     setImportNote('');
 
     try {
-      const text = await extractPolicyPdfText(file);
+      const extracted = await extractPolicyPdf(file);
       const res = await fetch('/api/parse-policy', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, fileName: file.name }),
+        body: JSON.stringify({
+          text: extracted.text,
+          images: extracted.scannedImages,
+          fileName: file.name,
+        }),
       });
       const data = await res.json().catch(() => ({})) as ParsePolicyResponse;
       if (!res.ok) throw new Error(data.error || 'PDF 解析失敗');
 
       applyParsedPolicy(data);
       const chunkText = data.chunks_processed ? `，已分析 ${data.chunks_processed} 段` : '';
+      const scannedText = data.scanned_pages_processed
+        ? `，掃描版 OCR ${data.scanned_pages_processed} 頁`
+        : extracted.scannedImages.length > 0
+          ? `，已提交掃描 OCR ${extracted.scannedImages.length} 頁`
+          : '';
       const truncated = data.truncated ? '。文件太長，已先處理前段主要內容' : '';
-      setImportNote(`已從 PDF 自動填入保單資料${chunkText}${truncated}，請覆核後儲存。`);
+      const localOnly = data.local_rules ? '（只用本地規則，未經 Claude）' : '';
+      setImportNote(`已從 PDF 自動填入保單資料${chunkText}${scannedText}${truncated}${localOnly}，請覆核後儲存。`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'PDF 解析失敗，請再試一次');
     } finally {
@@ -354,7 +378,7 @@ export function NewPolicyForm({
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-gray-900">PDF 匯入保單資料</p>
               <p className="text-xs text-gray-400 mt-0.5">
-                {isEditing ? '可重新匯入 PDF 覆蓋表格內容' : '先遮蔽身份資料，再抽取回本、身故賠償同 20 年情況'}
+                {isEditing ? '可重新匯入 PDF 覆蓋表格內容' : '文字版直接抽取；掃描版會用本機 Ollama Vision OCR 前幾頁'}
               </p>
             </div>
             <button
@@ -542,7 +566,7 @@ function TextArea({
   );
 }
 
-async function extractPolicyPdfText(file: File) {
+async function extractPolicyPdf(file: File): Promise<ExtractedPolicyPdf> {
   const pdfjs = await import('pdfjs-dist');
   pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 
@@ -575,11 +599,45 @@ async function extractPolicyPdfText(file: File) {
     }
   }
 
-  const extracted = pages.join('\n\n').trim();
-  if (!extracted) {
-    throw new Error('PDF 入面未讀到文字；如果係掃描 PDF，請先用圖片/OCR 方式處理。');
+  let extracted = pages.join('\n\n').trim();
+  if (truncated && extracted.length > MAX_POLICY_TEXT_CHARS) {
+    extracted = `${extracted.slice(0, MAX_POLICY_TEXT_CHARS)}\n\n[文件較長，已先讀取前 ${MAX_POLICY_TEXT_CHARS.toLocaleString('zh-HK')} 字。]`;
   }
 
-  if (!truncated || extracted.length <= MAX_POLICY_TEXT_CHARS) return extracted;
-  return `${extracted.slice(0, MAX_POLICY_TEXT_CHARS)}\n\n[文件較長，已先讀取前 ${MAX_POLICY_TEXT_CHARS.toLocaleString('zh-HK')} 字。]`;
+  const scannedImages = extracted.length < 1000
+    ? await renderPolicyPagesForOcr(pdf, Math.min(pdf.numPages, 6))
+    : [];
+
+  if (!extracted && scannedImages.length === 0) {
+    throw new Error('PDF 入面未讀到文字；如屬掃描版 PDF，請確認瀏覽器支援 PDF render 後再試。');
+  }
+
+  return { text: extracted, scannedImages, totalPages: pdf.numPages };
+}
+
+async function renderPolicyPagesForOcr(
+  pdf: import('pdfjs-dist').PDFDocumentProxy,
+  pageLimit: number
+): Promise<PolicyScanImage[]> {
+  const images: PolicyScanImage[] = [];
+
+  for (let pageNumber = 1; pageNumber <= pageLimit; pageNumber += 1) {
+    const page = await pdf.getPage(pageNumber);
+    const viewport = page.getViewport({ scale: 1.4 });
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    if (!context) continue;
+
+    canvas.width = Math.ceil(viewport.width);
+    canvas.height = Math.ceil(viewport.height);
+    await page.render({ canvasContext: context, viewport }).promise;
+
+    images.push({
+      page: pageNumber,
+      base64: canvas.toDataURL('image/jpeg', 0.78).split(',')[1],
+      mediaType: 'image/jpeg',
+    });
+  }
+
+  return images;
 }

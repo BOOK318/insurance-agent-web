@@ -11,6 +11,9 @@ const MODEL = 'claude-haiku-4-5';
 const MAX_TOTAL_CHARS = 220_000;
 const DIRECT_CHARS = 55_000;
 const CHUNK_CHARS = 18_000;
+const OLLAMA_URL = process.env.OLLAMA_URL ?? 'http://localhost:11434';
+const VISION_MODEL = process.env.OLLAMA_VISION_MODEL ?? 'qwen2.5vl:7b';
+const MAX_OCR_IMAGES = 6;
 
 type ClientRow = {
   id: string;
@@ -49,6 +52,12 @@ type PolicyExtraction = {
   start_date?: string | null;
   expiry_date?: string | null;
   notes?: string | null;
+};
+
+type PolicyScanImage = {
+  page?: number;
+  base64?: string;
+  mediaType?: string;
 };
 
 const TEXT_FIELDS: Array<keyof PolicyExtraction> = [
@@ -126,6 +135,57 @@ function normalizeInput(value: unknown) {
   return typeof value === 'string'
     ? value.replace(/\0/g, '').replace(/\r\n/g, '\n').trim()
     : '';
+}
+
+async function callOllamaVision(imageBase64: string, pageLabel: string) {
+  const res = await fetch(`${OLLAMA_URL}/api/chat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: VISION_MODEL,
+      messages: [
+        {
+          role: 'system',
+          content: '你係香港保單 OCR 助手。讀取保單/建議書圖片，提取所有可見文字、表格、數字、日期同保單資料。保持原有結構；只輸出提取文字，唔好加評論。',
+        },
+        {
+          role: 'user',
+          content: `請 OCR ${pageLabel}，保留保單號碼、公司、產品、保費、保額、現金價值表、身故賠償、日期等資料。`,
+          images: [imageBase64],
+        },
+      ],
+      stream: false,
+      options: { temperature: 0 },
+    }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Ollama Vision ${res.status}: ${text}`);
+  }
+
+  const data = await res.json() as { message?: { content?: string }; response?: string };
+  return (data.message?.content ?? data.response ?? '').trim();
+}
+
+async function ocrPolicyImages(images: PolicyScanImage[]) {
+  const validImages = images
+    .filter(image => typeof image.base64 === 'string' && image.base64.length > 0)
+    .slice(0, MAX_OCR_IMAGES);
+
+  const pages: string[] = [];
+  for (const image of validImages) {
+    const pageLabel = image.page ? `第 ${image.page} 頁` : '其中一頁';
+    const text = await callOllamaVision(image.base64 as string, pageLabel);
+    if (text) {
+      pages.push(`[本機 Ollama Vision OCR：${pageLabel}]\n${scrubFreeTextPII(text)}`);
+    }
+  }
+
+  return {
+    text: pages.join('\n\n').trim(),
+    pagesProcessed: validImages.length,
+  };
 }
 
 function escapeRegExp(value: string) {
@@ -650,11 +710,32 @@ export async function POST(req: NextRequest) {
   const user = await getSession();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const body = await req.json().catch(() => ({})) as { text?: string; fileName?: string };
-  const rawText = normalizeInput(body.text);
+  const body = await req.json().catch(() => ({})) as {
+    text?: string;
+    fileName?: string;
+    images?: PolicyScanImage[];
+  };
+  let rawText = normalizeInput(body.text);
+  let scannedPagesProcessed = 0;
+
+  if (rawText.length < 1000 && Array.isArray(body.images) && body.images.length > 0) {
+    try {
+      const ocr = await ocrPolicyImages(body.images);
+      scannedPagesProcessed = ocr.pagesProcessed;
+      rawText = [rawText, ocr.text].filter(Boolean).join('\n\n').trim();
+    } catch (err) {
+      if (rawText.length < 20) {
+        return NextResponse.json(
+          { error: '掃描版 PDF OCR 失敗：' + (err as Error).message + '。請確認本機 Ollama Vision 已啟動。' },
+          { status: 503 }
+        );
+      }
+    }
+  }
+
   if (rawText.length < 20) {
     return NextResponse.json(
-      { error: 'PDF 入面未讀到足夠文字；如果係掃描 PDF，請先用圖片/OCR 方式處理。' },
+      { error: 'PDF 入面未讀到足夠文字；如果係掃描 PDF，請確認本機 Ollama Vision 已啟動後再試。' },
       { status: 400 }
     );
   }
@@ -676,6 +757,7 @@ export async function POST(req: NextRequest) {
         truncated: rawText.length > MAX_TOTAL_CHARS,
         file_name: body.fileName ?? null,
         local_rules: true,
+        scanned_pages_processed: scannedPagesProcessed,
       });
     }
     return NextResponse.json(
@@ -723,6 +805,7 @@ export async function POST(req: NextRequest) {
         truncated: sanitized.truncated,
         file_name: body.fileName ?? null,
         local_rules: true,
+        scanned_pages_processed: scannedPagesProcessed,
       });
     }
     return NextResponse.json(
@@ -748,5 +831,6 @@ export async function POST(req: NextRequest) {
     redacted: true,
     truncated: sanitized.truncated,
     file_name: body.fileName ?? null,
+    scanned_pages_processed: scannedPagesProcessed,
   });
 }

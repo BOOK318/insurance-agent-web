@@ -39,7 +39,13 @@ const EMPTY: CreateFields = {
   password: '',
 };
 
-export function UsersAdminPanel({ initialUsers }: { initialUsers: AdminUserRow[] }) {
+export function UsersAdminPanel({
+  initialUsers,
+  maxActiveUsers,
+}: {
+  initialUsers: AdminUserRow[];
+  maxActiveUsers: number;
+}) {
   const router = useRouter();
   const [fields, setFields] = useState<CreateFields>(EMPTY);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -101,6 +107,7 @@ export function UsersAdminPanel({ initialUsers }: { initialUsers: AdminUserRow[]
   }
 
   const activeCount = initialUsers.filter(user => user.is_active).length;
+  const activeLimitReached = activeCount >= maxActiveUsers;
 
   return (
     <div>
@@ -113,7 +120,7 @@ export function UsersAdminPanel({ initialUsers }: { initialUsers: AdminUserRow[]
 
       <div className="grid grid-cols-3 gap-2 mb-5">
         <Stat label="總帳號" value={initialUsers.length} />
-        <Stat label="啟用中" value={activeCount} />
+        <Stat label={`啟用中 / ${maxActiveUsers}`} value={activeCount} />
         <Stat label="Agent" value={initialUsers.filter(user => user.role === 'agent').length} />
       </div>
 
@@ -141,12 +148,17 @@ export function UsersAdminPanel({ initialUsers }: { initialUsers: AdminUserRow[]
         </div>
         <button
           type="submit"
-          disabled={creating}
+          disabled={creating || activeLimitReached}
           className="inline-flex items-center justify-center gap-2 bg-blue-700 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-blue-800 disabled:opacity-60 transition"
         >
           {creating ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
-          {creating ? '建立中...' : '建立帳號'}
+          {creating ? '建立中...' : activeLimitReached ? '已達帳號上限' : '建立帳號'}
         </button>
+        {activeLimitReached && (
+          <p className="text-xs text-amber-700">
+            呢套系統最多 {maxActiveUsers} 個啟用帳號。要新增帳號，請先停用暫時唔用嘅帳號。
+          </p>
+        )}
       </form>
 
       {msg && (

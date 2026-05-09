@@ -1,5 +1,6 @@
 import { db } from '../../../lib/db';
 import { UsersAdminPanel, type AdminUserRow } from './users-admin-panel';
+import { getMaxActiveUsers } from '../../../lib/security';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,5 +13,5 @@ export default async function AdminUsersPage() {
        created_at DESC`
   );
 
-  return <UsersAdminPanel initialUsers={users} />;
+  return <UsersAdminPanel initialUsers={users} maxActiveUsers={getMaxActiveUsers()} />;
 }

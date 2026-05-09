@@ -15,6 +15,52 @@ import { test, expect } from '@playwright/test';
 const AGENT = { email: 'agent@team.local', password: 'Agent@1234' };
 const ADMIN = { email: 'admin@team.local', password: 'Admin@1234' };
 
+test.beforeAll(async ({ request }) => {
+  const adminLogin = await request.post('/api/auth/login', { data: ADMIN });
+  expect(adminLogin.ok()).toBeTruthy();
+
+  const usersRes = await request.get('/api/admin/users');
+  expect(usersRes.ok()).toBeTruthy();
+  const users = await usersRes.json() as Array<{ id: string; email: string; is_active: boolean }>;
+  const existingAgent = users.find(user => user.email === AGENT.email);
+
+  if (existingAgent) {
+    const patch = await request.patch('/api/admin/users', {
+      data: { id: existingAgent.id, password: AGENT.password, is_active: true },
+    });
+    expect(patch.ok()).toBeTruthy();
+  } else {
+    const create = await request.post('/api/admin/users', {
+      data: {
+        name: '測試 Agent',
+        email: AGENT.email,
+        role: 'agent',
+        password: AGENT.password,
+      },
+    });
+    expect(create.ok()).toBeTruthy();
+  }
+
+  await request.post('/api/auth/login', { data: AGENT });
+  const existingClients = await request.get('/api/clients?q=' + encodeURIComponent('陳家'));
+  expect(existingClients.ok()).toBeTruthy();
+  const clients = await existingClients.json() as Array<{ id: string }>;
+  if (clients.length === 0) {
+    const createClient = await request.post('/api/clients', {
+      data: {
+        name_zh: '陳家俊',
+        name_en: 'Ka Chun Chan',
+        phone: '+852 9123 4567',
+        email: 'kachun.chan@example.com',
+        occupation: '金融分析師',
+        annual_income: 850000,
+        family_notes: '已婚，育有兩名子女。',
+      },
+    });
+    expect(createClient.ok()).toBeTruthy();
+  }
+});
+
 async function login(page: import('@playwright/test').Page, who: { email: string; password: string }) {
   await page.goto('/login');
   // Login form's labels aren't htmlFor-bound — use input type/role instead
@@ -32,7 +78,7 @@ test('agent can log in and see the dashboard', async ({ page }) => {
 test('clients list renders for agent', async ({ page }) => {
   await login(page, AGENT);
   // Wait for the post-login navigation to settle before requesting /clients
-  await page.waitForURL(/^http:\/\/localhost:3000\/(\?.*)?$/, { timeout: 10000 });
+  await page.waitForURL(/\/(?:$|\?)/, { timeout: 10000 });
   await page.goto('/clients');
   await page.waitForURL('**/clients', { timeout: 10000 });
   await expect(page.locator('h1', { hasText: '我的客戶' })).toBeVisible({ timeout: 10000 });
