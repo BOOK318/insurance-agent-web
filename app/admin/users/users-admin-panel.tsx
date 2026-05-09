@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { Loader2, Plus, RotateCcw, UserCheck, UserX } from 'lucide-react';
+import { Check, Loader2, Plus, RotateCcw, X, UserCheck, UserX } from 'lucide-react';
 
 export type AdminUserRow = {
   id: string;
@@ -50,6 +50,8 @@ export function UsersAdminPanel({
   const [fields, setFields] = useState<CreateFields>(EMPTY);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [resetUserId, setResetUserId] = useState<string | null>(null);
+  const [resetPasswordValue, setResetPasswordValue] = useState('');
   const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
 
   function set<K extends keyof CreateFields>(key: K, value: CreateFields[K]) {
@@ -100,10 +102,18 @@ export function UsersAdminPanel({
     router.refresh();
   }
 
-  async function resetPassword(user: AdminUserRow) {
-    const password = prompt(`輸入 ${user.name} 嘅新密碼`);
-    if (!password) return;
-    await updateUser(user.id, { password }, '已重設密碼');
+  function openResetPassword(user: AdminUserRow) {
+    setMsg(null);
+    setResetUserId(user.id);
+    setResetPasswordValue('');
+  }
+
+  async function resetPassword(e: FormEvent<HTMLFormElement>, user: AdminUserRow) {
+    e.preventDefault();
+    if (!resetPasswordValue.trim()) return;
+    await updateUser(user.id, { password: resetPasswordValue }, '已重設密碼');
+    setResetUserId(null);
+    setResetPasswordValue('');
   }
 
   const activeCount = initialUsers.filter(user => user.is_active).length;
@@ -193,7 +203,7 @@ export function UsersAdminPanel({
                 <IconButton
                   label="重設密碼"
                   disabled={busyId === user.id}
-                  onClick={() => resetPassword(user)}
+                  onClick={() => openResetPassword(user)}
                 >
                   <RotateCcw size={15} />
                 </IconButton>
@@ -216,6 +226,43 @@ export function UsersAdminPanel({
                 )}
               </div>
             </div>
+            {resetUserId === user.id && (
+              <form onSubmit={e => resetPassword(e, user)} className="mt-3 border-t border-gray-100 pt-3">
+                <label className="text-xs text-gray-400 block mb-1">新密碼</label>
+                <div className="flex gap-2">
+                  <input
+                    type="password"
+                    value={resetPasswordValue}
+                    onChange={e => setResetPasswordValue(e.target.value)}
+                    autoFocus
+                    autoComplete="new-password"
+                    placeholder="最少 10 個字，包含大楷、小楷同數字"
+                    className="min-w-0 flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <button
+                    type="submit"
+                    disabled={busyId === user.id || !resetPasswordValue.trim()}
+                    className="w-10 h-10 rounded-xl bg-blue-700 text-white hover:bg-blue-800 disabled:opacity-50 flex items-center justify-center transition"
+                    aria-label="確認重設密碼"
+                    title="確認重設密碼"
+                  >
+                    {busyId === user.id ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setResetUserId(null);
+                      setResetPasswordValue('');
+                    }}
+                    className="w-10 h-10 rounded-xl bg-gray-50 text-gray-600 hover:bg-gray-100 flex items-center justify-center transition"
+                    aria-label="取消"
+                    title="取消"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         ))}
       </div>
