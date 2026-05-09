@@ -1,6 +1,8 @@
 import { db } from '../../lib/db';
 import { formatHKD } from '../../lib/utils';
 
+export const dynamic = 'force-dynamic';
+
 export default async function HeadDashboard() {
   const [agentStats, topPolicies, pendingClaims] = await Promise.all([
     db.query(`
