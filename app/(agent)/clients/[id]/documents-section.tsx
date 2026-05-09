@@ -28,6 +28,7 @@ export function DocumentsSection({ clientId }: { clientId: string }) {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [drag, setDrag] = useState(false);
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
   const [error, setError] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -59,8 +60,8 @@ export function DocumentsSection({ clientId }: { clientId: string }) {
   }
 
   async function remove(id: string) {
-    if (!confirm('確定要刪除呢個文件？')) return;
     const res = await fetch('/api/documents/' + id, { method: 'DELETE' });
+    setConfirmingDeleteId(null);
     if (res.ok) setDocs(prev => prev.filter(d => d.id !== id));
   }
 
@@ -133,13 +134,30 @@ export function DocumentsSection({ clientId }: { clientId: string }) {
                   {fmtSize(Number(d.size_bytes))} · {new Date(d.created_at).toLocaleDateString('zh-HK')}
                 </p>
               </a>
-              <button
-                onClick={() => remove(d.id)}
-                className="w-8 h-8 rounded-full text-gray-400 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center"
-                aria-label="刪除"
-              >
-                <Trash2 size={13} />
-              </button>
+              {confirmingDeleteId === d.id ? (
+                <div className="flex items-center gap-1 text-xs">
+                  <button
+                    onClick={() => remove(d.id)}
+                    className="px-2 py-1 rounded-lg bg-rose-50 text-rose-700 font-semibold hover:bg-rose-100"
+                  >
+                    確定
+                  </button>
+                  <button
+                    onClick={() => setConfirmingDeleteId(null)}
+                    className="px-2 py-1 rounded-lg text-gray-500 hover:bg-gray-50"
+                  >
+                    取消
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setConfirmingDeleteId(d.id)}
+                  className="w-8 h-8 rounded-full text-gray-400 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center"
+                  aria-label="刪除"
+                >
+                  <Trash2 size={13} />
+                </button>
+              )}
             </div>
           ))}
         </div>
