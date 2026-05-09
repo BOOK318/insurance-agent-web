@@ -2,6 +2,34 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '../../../../lib/db';
 import { getSession } from '../../../../lib/auth';
 
+const GENDERS = new Set(['M', 'F', 'Other']);
+
+function text(value: unknown) {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function nullableText(value: unknown) {
+  const result = text(value);
+  return result || null;
+}
+
+function nullableNumber(value: unknown) {
+  if (value === null || value === undefined || value === '') return null;
+  const num = Number(value);
+  return Number.isFinite(num) ? num : NaN;
+}
+
+function nullableDate(value: unknown) {
+  const result = text(value);
+  return result || null;
+}
+
+function nullableGender(value: unknown) {
+  const result = nullableText(value);
+  if (!result) return null;
+  return GENDERS.has(result) ? result : '__INVALID__';
+}
+
 type Params = { params: Promise<{ id: string }> };
 
 export async function GET(_req: NextRequest, { params }: Params) {
@@ -28,6 +56,23 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
   const { id } = await params;
   const b = await req.json() as Record<string, unknown>;
+  const nameZh = nullableText(b.name_zh);
+  const nameEn = nullableText(b.name_en);
+  const annualIncome = nullableNumber(b.annual_income);
+  const monthlyExpenses = nullableNumber(b.monthly_expenses);
+  const mortgageBalance = nullableNumber(b.mortgage_balance);
+  const dependentsCount = nullableNumber(b.dependents_count);
+  const gender = nullableGender(b.gender);
+
+  if (!nameZh && !nameEn) {
+    return NextResponse.json({ error: '請輸入客戶姓名' }, { status: 400 });
+  }
+  if ([annualIncome, monthlyExpenses, mortgageBalance, dependentsCount].some(Number.isNaN)) {
+    return NextResponse.json({ error: '數字格式不正確' }, { status: 400 });
+  }
+  if (gender === '__INVALID__') {
+    return NextResponse.json({ error: '性別格式不正確' }, { status: 400 });
+  }
 
   const { rows } = await db.query(
     `UPDATE clients SET
@@ -37,12 +82,12 @@ export async function PUT(req: NextRequest, { params }: Params) {
        financial_goals=$12, dob=$13, gender=$14, family_notes=$15,
        assets_notes=$16, property_notes=$17, preferences=$18, nationality=$19,
        notes=$20, updated_at=NOW()
-     WHERE id=$21 AND agent_id=$22 RETURNING *`,
-    [b.name_zh, b.name_en, b.phone, b.email, b.occupation,
-     b.annual_income, b.monthly_expenses, b.mortgage_balance,
-     b.liabilities_notes, b.dependents_count, b.existing_coverage_notes,
-     b.financial_goals, b.dob, b.gender, b.family_notes, b.assets_notes,
-     b.property_notes, b.preferences, b.nationality, b.notes, id, user.id]
+     WHERE id=$21 AND agent_id=$22 AND deleted_at IS NULL RETURNING *`,
+    [nameZh, nameEn, nullableText(b.phone), nullableText(b.email), nullableText(b.occupation),
+     annualIncome, monthlyExpenses, mortgageBalance,
+     nullableText(b.liabilities_notes), dependentsCount, nullableText(b.existing_coverage_notes),
+     nullableText(b.financial_goals), nullableDate(b.dob), gender, nullableText(b.family_notes), nullableText(b.assets_notes),
+     nullableText(b.property_notes), nullableText(b.preferences), nullableText(b.nationality), nullableText(b.notes), id, user.id]
   );
   if (!rows[0]) return NextResponse.json({ error: 'Not found' }, { status: 404 });
   return NextResponse.json(rows[0]);
