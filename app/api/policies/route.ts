@@ -4,6 +4,14 @@ import { getSession } from '../../../lib/auth';
 
 const POLICY_STATUSES = new Set(['active', 'lapsed', 'surrendered']);
 const POLICY_TYPES = new Set(['醫療', '危疾', '人壽', '年金', '意外', '儲蓄', '投資相連', '其他']);
+const LEGACY_POLICY_TYPES: Record<string, string> = {
+  medical: '醫療',
+  critical_illness: '危疾',
+  life: '人壽',
+  accident: '意外',
+  savings: '儲蓄',
+  travel: '其他',
+};
 const CURRENCIES = new Set(['HKD', 'USD', 'CNY', 'AUD', 'CAD', 'GBP', 'EUR', 'SGD']);
 
 function text(value: unknown) {
@@ -13,6 +21,11 @@ function text(value: unknown) {
 function nullableText(value: unknown) {
   const result = text(value);
   return result || null;
+}
+
+function normalizePolicyType(value: unknown) {
+  const result = text(value);
+  return LEGACY_POLICY_TYPES[result] ?? result;
 }
 
 function nullableNumber(value: unknown) {
@@ -46,7 +59,7 @@ export async function POST(req: NextRequest) {
   const clientId = text(b.client_id);
   const policyNumber = text(b.policy_number);
   const company = text(b.company);
-  const type = text(b.type);
+  const type = normalizePolicyType(b.type);
   const currency = text(b.currency) || 'HKD';
   const status = text(b.status) || 'active';
   const premium = nullableNumber(b.premium);

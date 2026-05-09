@@ -9,6 +9,15 @@ import {
 
 export const dynamic = 'force-dynamic';
 
+const LEGACY_POLICY_TYPES: Record<string, string> = {
+  medical: '醫療',
+  critical_illness: '危疾',
+  life: '人壽',
+  accident: '意外',
+  savings: '儲蓄',
+  travel: '其他',
+};
+
 const POLICY_FIELDS: Array<keyof PolicyFormInitial> = [
   'client_id',
   'policy_number',
@@ -43,6 +52,9 @@ function serializePolicy(policy: Record<string, unknown>): PolicyFormInitial {
       initial[key] = value.toISOString().slice(0, 10);
     } else if (value === null || value === undefined) {
       initial[key] = '';
+    } else if (key === 'type') {
+      const type = String(value);
+      initial[key] = LEGACY_POLICY_TYPES[type] ?? type;
     } else {
       initial[key] = String(value);
     }
