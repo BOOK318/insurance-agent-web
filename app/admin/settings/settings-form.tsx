@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 export function SettingsForm({ hasValue }: { hasValue: boolean }) {
   const [key, setKey] = useState('');
   const [saving, setSaving] = useState(false);
+  const [confirmingClear, setConfirmingClear] = useState(false);
   const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
   const router = useRouter();
 
@@ -30,11 +31,14 @@ export function SettingsForm({ hasValue }: { hasValue: boolean }) {
   }
 
   async function clear() {
-    if (!confirm('確定要清除已儲存嘅 key？')) return;
     const res = await fetch('/api/admin/settings?key=ANTHROPIC_API_KEY', { method: 'DELETE' });
+    setConfirmingClear(false);
     if (res.ok) {
       setMsg({ type: 'ok', text: '已清除。系統會回退到 .env.local 嘅值（如有）。' });
       router.refresh();
+    } else {
+      const { error } = (await res.json().catch(() => ({}))) as { error?: string };
+      setMsg({ type: 'err', text: error ?? '清除失敗' });
     }
   }
 
@@ -56,14 +60,33 @@ export function SettingsForm({ hasValue }: { hasValue: boolean }) {
         >
           {saving ? '儲存中…' : '儲存'}
         </button>
-        {hasValue && (
+        {hasValue && !confirmingClear && (
           <button
             type="button"
-            onClick={clear}
+            onClick={() => { setMsg(null); setConfirmingClear(true); }}
             className="text-sm text-gray-600 hover:text-red-600 px-3 py-2"
           >
             清除已儲存
           </button>
+        )}
+        {hasValue && confirmingClear && (
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-gray-600">確定清除？</span>
+            <button
+              type="button"
+              onClick={clear}
+              className="text-red-700 font-semibold px-2 py-1 rounded hover:bg-red-50"
+            >
+              確定
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirmingClear(false)}
+              className="text-gray-600 px-2 py-1 rounded hover:bg-gray-50"
+            >
+              取消
+            </button>
+          </div>
         )}
       </div>
       {msg && (
