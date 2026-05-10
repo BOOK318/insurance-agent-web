@@ -116,6 +116,19 @@ function AIChat() {
     scrollerRef.current?.scrollTo({ top: scrollerRef.current.scrollHeight, behavior: 'smooth' });
   }, [messages, loading]);
 
+  useEffect(() => () => {
+    recorderRef.current?.cancel();
+    recorderRef.current = null;
+    const recognition = recognitionRef.current;
+    if (recognition) {
+      recognition.onresult = null;
+      recognition.onerror = null;
+      recognition.onend = null;
+      recognition.stop();
+      recognitionRef.current = null;
+    }
+  }, []);
+
   // ── Voice Input ──────────────────────────────────────────
   async function toggleRecording() {
     if (recording) {

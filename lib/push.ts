@@ -29,6 +29,7 @@ export type PushPayload = {
 };
 
 function isDeadSubscriptionError(err: unknown) {
+  // Keep in sync with worker/reminders-worker.mjs.
   const pushError = err as { statusCode?: number; body?: unknown };
   if (pushError.statusCode === 404 || pushError.statusCode === 410) return true;
   return pushError.statusCode === 400

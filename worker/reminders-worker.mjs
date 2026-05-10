@@ -45,6 +45,7 @@ async function getSubscriptions(userId) {
 }
 
 function isDeadSubscriptionError(err) {
+  // Keep in sync with lib/push.ts.
   if (err?.statusCode === 404 || err?.statusCode === 410) return true;
   return err?.statusCode === 400
     && typeof err?.body === 'string'

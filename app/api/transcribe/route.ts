@@ -16,11 +16,6 @@ const ALLOWED_AUDIO_TYPES = new Set([
   'audio/x-wav',
 ]);
 
-function fileNameFor(type: string) {
-  if (type.includes('wav')) return 'audio.wav';
-  return 'audio.webm';
-}
-
 function normalizeText(value: unknown) {
   return typeof value === 'string' ? value.trim() : '';
 }
@@ -47,7 +42,7 @@ export async function POST(req: NextRequest) {
   }
 
   const upstream = new FormData();
-  upstream.append('file', audio, fileNameFor(contentType));
+  upstream.append('file', audio, 'audio.wav');
   upstream.append('language', 'zh');
   upstream.append('temperature', '0');
   upstream.append('response_format', 'json');

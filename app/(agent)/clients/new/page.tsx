@@ -1,5 +1,5 @@
 'use client';
-import { useState, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Mic, MicOff, Camera, Loader2, Save, X } from 'lucide-react';
 import Link from 'next/link';
@@ -95,6 +95,19 @@ export default function NewClientPage() {
     setToast(msg);
     setTimeout(() => setToast(''), 3000);
   }
+
+  useEffect(() => () => {
+    recorderRef.current?.cancel();
+    recorderRef.current = null;
+    const recognition = recognitionRef.current;
+    if (recognition) {
+      recognition.onresult = null;
+      recognition.onerror = null;
+      recognition.onend = null;
+      recognition.stop();
+      recognitionRef.current = null;
+    }
+  }, []);
 
   // ── Voice Input ──────────────────────────────────────────
   async function toggleRecording() {
