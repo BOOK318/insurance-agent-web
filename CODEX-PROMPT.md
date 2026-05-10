@@ -1,194 +1,365 @@
-# New Project: Hong Kong Insurance Comparison Platform (Customer-Facing)
+# Codex Bootstrap Prompt for `insurance-agent-web`
 
-This is a **brand new standalone project** — a public-facing insurance comparison website for Hong Kong consumers. It is NOT an extension of the existing agent CRM.
+Copy the prompt below into Codex on a new Mac when you want it to install,
+run, and verify this project from GitHub.
 
-## What to build
+---
 
-A Next.js web app where Hong Kong consumers can compare insurance plans across all major insurers with full transparency. Think "10Life but we show the math."
+## Prompt to give Codex
 
-**Tech stack**: Next.js 15 (App Router), React 18, Tailwind CSS, PostgreSQL, Claude API (Anthropic SDK)
-**Language**: TypeScript
-**Target**: Mobile-first (85%+ HK traffic is mobile), bilingual 中文/English
+You are setting up my Hong Kong insurance agent CRM on this computer.
 
-## Core features (in build order)
+Repository:
 
-### 1. Savings Plan Comparison (`/compare/savings`)
-- Side-by-side comparison of 儲蓄保 plans from different insurers
-- **Adjustable-weight ranking**: 4 sliders (early surrender loss, guaranteed return, projected return, long-term growth) — user drags sliders, ranking re-sorts instantly. Show the formula, not a black-box star rating.
-- **Hidden Fee X-Ray section**:
-  - Year-by-year surrender value table (selectable years)
-  - Early surrender loss bars (red, showing "第3年退保蝕90%")
-  - Guaranteed vs non-guaranteed stacked bar (green vs yellow)
-  - Total fees over 20 years in HK$ (not %)
-  - "If you cancel in year 3, you lose $X" — big red number
-  - Guaranteed IRR vs projected IRR side-by-side
-  - Interactive line chart: surrender value over time with draggable year marker
-- Filter by: currency (HKD/USD), payment term (5Y/10Y/lump sum), age group
-
-### 2. VHIS Medical Comparison (`/compare/medical`)
-- Compare 自願醫保 (VHIS) plans across insurers
-- Key fields: annual premium by age band, lifetime limit, annual limit, deductible (墊底費), room class, outpatient coverage, guaranteed renewal age, overseas coverage, day surgery
-- X-Ray: total premium paid over 20 years vs typical claim amounts by age
-- VHIS tax deduction calculator (up to HKD $8,000/year)
-- Family bundle view (parent + spouse + children)
-
-### 3. Critical Illness Comparison (`/compare/ci`)
-- Number of conditions covered, early/mid/late stage payout %, multi-claim support, children add-on
-- Premium comparison by age/gender/smoker status
-
-### 4. AI Advisor Chat (`/advisor`)
-- Claude-powered conversational assistant in 廣東話
-- User describes their situation: "我35歲，月入5萬，有老婆同一個BB，budget $3000/月"
-- AI analyzes needs, presents relevant plan categories, shows data comparisons
-- **CRITICAL**: AI must NEVER recommend or suggest buying any specific plan. Only analyze and present data.
-- Every response must end with: "以上資料僅供參考，不構成任何投保建議。"
-- All AI responses must be logged for audit trail
-
-### 5. Existing Policy Review (`/review`)
-- User uploads policy PDF → Claude extracts key data (insurer, product, premium, coverage, surrender values)
-- Shows: "Your current coverage summary" + "Potential gaps" (e.g., no CI cover, medical cap too low)
-- Compare existing policy against current market alternatives
-- **NEVER say "you should switch"** — only show data side-by-side
-
-### 6. Claim Experience Database (`/claims`)
-- Users submit anonymized claim experiences (insurer, claim type, days to payout, approved/rejected, notes)
-- Moderated before publishing
-- Aggregate stats: average payout time per insurer, rejection rate
-- Combined with IA complaint data (public from ia.org.hk)
-
-## Data architecture
-
-### Plan data schema (PostgreSQL)
-
-```sql
-CREATE TABLE insurers (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name_en TEXT NOT NULL,
-  name_zh TEXT NOT NULL,
-  logo_url TEXT,
-  website TEXT,
-  ia_complaint_rate NUMERIC,
-  ia_complaint_year INTEGER,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE TABLE plans (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  insurer_id UUID REFERENCES insurers(id),
-  category TEXT NOT NULL CHECK (category IN ('savings','medical','critical-illness','life','annuity')),
-  product_name_en TEXT NOT NULL,
-  product_name_zh TEXT NOT NULL,
-  currency TEXT DEFAULT 'HKD',
-  payment_term_years INTEGER,
-  policy_term TEXT,
-  is_active BOOLEAN DEFAULT TRUE,
-  source_pdf_url TEXT,
-  data_date DATE,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE TABLE plan_quotes (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  plan_id UUID REFERENCES plans(id),
-  profile_age INTEGER NOT NULL,
-  profile_gender TEXT NOT NULL CHECK (profile_gender IN ('M','F')),
-  profile_smoker BOOLEAN DEFAULT FALSE,
-  monthly_premium NUMERIC,
-  annual_premium NUMERIC,
-  total_premium_paid NUMERIC,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE TABLE surrender_values (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  quote_id UUID REFERENCES plan_quotes(id),
-  policy_year INTEGER NOT NULL,
-  total_paid NUMERIC NOT NULL,
-  guaranteed_value NUMERIC NOT NULL,
-  non_guaranteed_value NUMERIC,
-  total_surrender_value NUMERIC NOT NULL
-);
-
-CREATE TABLE medical_plan_details (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  plan_id UUID REFERENCES plans(id),
-  lifetime_limit NUMERIC,
-  annual_limit NUMERIC,
-  deductible NUMERIC,
-  room_class TEXT,
-  outpatient_coverage BOOLEAN DEFAULT FALSE,
-  guaranteed_renewal_age INTEGER,
-  overseas_coverage BOOLEAN DEFAULT FALSE,
-  day_surgery BOOLEAN DEFAULT TRUE
-);
-
-CREATE TABLE claim_experiences (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  insurer_id UUID REFERENCES insurers(id),
-  claim_type TEXT NOT NULL,
-  days_to_payout INTEGER,
-  amount_claimed NUMERIC,
-  amount_approved NUMERIC,
-  status TEXT CHECK (status IN ('approved','rejected','partial','pending')),
-  user_notes TEXT,
-  is_verified BOOLEAN DEFAULT FALSE,
-  is_published BOOLEAN DEFAULT FALSE,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
+```text
+https://github.com/BOOK318/insurance-agent-web
 ```
 
-### Seed data available
+Please clone the repo, read the setup docs, install the required local services,
+start the app, verify it is runnable, and leave me with the local URL and any
+external tunnel URL.
 
-We have 3 complete savings plan illustrations (30M non-smoker, USD $1,300/month, 5Y payment) with full surrender value tables extracted. JSON files are in the `knowledge-base/plans/savings/` folder of the existing repo — copy the data structure from there.
+### 1. Clone and inspect
 
-| Plan | Company | Year 5 Loss | 20Y Projected | 30Y Projected |
-|------|---------|-------------|---------------|---------------|
-| Swiss Prime (瑞盈) | Zurich | 85% | $210,411 | $381,988 |
-| Max Focus II (盈聚天下II) | FWD | 45% | $206,833 | $381,076 |
-| My Wealth Beyond (匠心飛越) | CTF Life | 74% | $207,072 | $422,843 |
+```bash
+cd ~/Documents
+git clone https://github.com/BOOK318/insurance-agent-web.git
+cd insurance-agent-web
+git status -sb
+```
 
-Key finding: **none of the 3 plans guarantee breakeven within 30 years**. All depend 60-70% on non-guaranteed bonuses.
+Read these files before changing anything:
 
-## Business model
+```text
+MAC-MINI-INSTALL-GUIDE.md
+WHISPER-MAC-MINI.md
+SETUP-GUIDE.md
+docker-compose.yml
+docker-compose.prod.yml
+.env.example
+.env.deploy.example
+package.json
+```
 
-- **Free for consumers** — no login required for comparison and X-Ray
-- **Revenue**: advertising from insurance agents/brokers (clearly marked "推廣 · Sponsored") + lead-gen commission
-- **NOT a licensed broker** initially — cannot recommend, cannot arrange contracts
-- Advertising slots must be **visually and structurally separated** from rankings. Rankings are formula-driven and never influenced by ad spend.
+Understand the app first:
 
-## Competitive positioning
+- Next.js 15 App Router CRM for insurance agents.
+- PostgreSQL stores users, clients, policies, claims, reminders, documents,
+  settings, push subscriptions, and audit/conversation records.
+- Claude is used for final AI replies and policy extraction where needed.
+- Ollama runs locally for intent detection, image/OCR preprocessing, and privacy
+  filtering before anything goes to Claude.
+- Whisper runs locally for voice transcription.
+- Web Push uses VAPID keys and works best through HTTPS, especially on iPhone.
 
-**Tagline: 「保險公司唔會話你知嘅嘢，我哋話你知。」**
+### 2. Install prerequisites on macOS
 
-vs 10Life: they say "trust our expert ratings" → we say "trust the math, adjust it yourself"
-vs MoneyHero: they do promo-driven lead-gen → we do data-driven transparency
-vs Bowtie: they only sell their own products → we compare everyone neutrally
+Install or verify:
 
-## IA regulatory constraints (MUST follow)
+```bash
+xcode-select --install
+```
 
-- **NEVER** use: 推薦, 最佳, 應該買, best buy, recommended, suggest — these constitute "inviting or inducing" under Insurance Ordinance and require IA broker license
-- **USE instead**: 排名工具, 資料比較, 數據分析, 僅供參考
-- **Every page** must include: "以上資料僅供參考，不構成任何投保建議。本平台不安排任何保險合約。"
-- **AI chat** must never say "you should buy X" — only analyze, compare, present data
-- **Ads** must be marked "推廣 · Sponsored" — never inside ranking tables
-- Reference: Insurance Ordinance Cap 41, Mayer Brown article on "regulated activity" definition
+```bash
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+brew install git node@20 docker docker-compose cloudflared ollama cmake ffmpeg
+```
 
-## Critical weaknesses to address (be honest about these)
+Docker Desktop is acceptable instead of Homebrew Docker. If Docker Desktop is
+used, open it once and confirm Docker is running:
 
-1. **Data is the bottleneck, not code.** Insurance illustrations are per-profile, not public datasets. Without 20-30+ plans the site looks empty. Plan for manual data entry pipeline + PDF extraction via Claude.
-2. **Same conflict of interest as 10Life.** Ad revenue from agents = you profit when users engage with insurance. "Open formula" helps but doesn't eliminate the tension. Be louder about disclosures than competitors.
-3. **IA can reinterpret the rules.** The line between "information" and "inducement" is grey. If AI output patterns consistently favor certain products, IA could investigate. Log everything, get legal review early.
-4. **Can't beat 10Life on breadth.** They have 50+ staff, 1500+ plans, years of SEO. Only viable strategy: own one niche deeply (savings plan fee transparency + policy review) and build a data moat via crowdsourced claim experiences.
-5. **AI advisor is a liability.** Users making financial decisions based on AI output could complain to IA. Disclaimers help but aren't bulletproof. Every AI response must be logged and auditable.
-6. **HK market is small.** ~1-2M addressable adults. Realistic MAU ceiling: 50-100K after 1-2 years. Unit economics must work at that scale.
-7. **Mobile-first is mandatory.** 85%+ HK web traffic is mobile. Every component must work at 375px width. Comparison tables must collapse to card layout on mobile — horizontal scroll tables will kill conversion.
+```bash
+docker info
+```
 
-## Design principles
+### 3. Create environment file
 
-- Mobile-first, always
-- 廣東話 tone of voice (casual, direct, like talking to a friend)
-- Show numbers, not opinions
-- Red = loss/danger, Green = gain/safe, Yellow = non-guaranteed/caution
-- Every ranking has visible formula + "排名由用戶自訂權重產生" disclaimer
-- No login wall — all comparison data is freely accessible
-- Ads clearly separated, never in ranking tables
+For a local source build:
+
+```bash
+cp .env.example .env
+```
+
+For a Mac mini / deployed team machine:
+
+```bash
+cp .env.deploy.example .env
+```
+
+Generate secrets:
+
+```bash
+openssl rand -hex 24
+openssl rand -hex 32
+```
+
+Generate Web Push VAPID keys:
+
+```bash
+docker run --rm node:20-alpine sh -c "npx -y web-push generate-vapid-keys --json"
+```
+
+Fill `.env` with real values:
+
+```env
+DB_PASSWORD=<strong random database password>
+JWT_SECRET=<32+ char random JWT secret>
+ANTHROPIC_API_KEY=<my Anthropic API key>
+
+# If using a real Cloudflare tunnel:
+CLOUDFLARE_TUNNEL_TOKEN=<Cloudflare tunnel token>
+TUNNEL_DOMAIN=<team domain, for example team-a.example.com>
+
+# If testing locally only:
+TUNNEL_DOMAIN=localhost:3000
+
+# Local Ollama on the Mac host, outside Docker:
+OLLAMA_URL=http://host.docker.internal:11434
+OLLAMA_MODEL=qwen2.5:7b
+OLLAMA_VISION_MODEL=qwen2.5vl:7b
+
+# Local Whisper on the Mac host, outside Docker:
+WHISPER_URL=http://host.docker.internal:9000/inference
+TRANSCRIBE_MAX_BYTES=26214400
+
+# Web Push:
+NEXT_PUBLIC_VAPID_PUBLIC_KEY=<generated publicKey>
+VAPID_PRIVATE_KEY=<generated privateKey>
+VAPID_SUBJECT=mailto:admin@team.local
+```
+
+Do not commit `.env`.
+
+### 4. Install and start Ollama
+
+Ollama is required for local extraction/OCR preprocessing.
+
+Start Ollama:
+
+```bash
+ollama serve
+```
+
+If `ollama serve` says Ollama is already running, that is fine.
+
+Pull the current 7B models:
+
+```bash
+ollama pull qwen2.5:7b
+ollama pull qwen2.5vl:7b
+```
+
+Verify:
+
+```bash
+curl http://localhost:11434/api/tags
+```
+
+Expected environment values for Docker:
+
+```env
+OLLAMA_URL=http://host.docker.internal:11434
+OLLAMA_MODEL=qwen2.5:7b
+OLLAMA_VISION_MODEL=qwen2.5vl:7b
+```
+
+### 5. Install and start local Whisper
+
+Whisper is required for local voice input. Use `whisper.cpp`.
+
+```bash
+cd ~
+git clone https://github.com/ggml-org/whisper.cpp.git
+cd whisper.cpp
+cmake -B build
+cmake --build build -j --config Release
+```
+
+Download a model. Start with `small` if the Mac is weaker; use `medium` for
+better Cantonese accuracy:
+
+```bash
+sh ./models/download-ggml-model.sh small
+# optional better model:
+sh ./models/download-ggml-model.sh medium
+```
+
+Run the Whisper HTTP server:
+
+```bash
+cd ~/whisper.cpp
+./build/bin/whisper-server \
+  -m models/ggml-small.bin \
+  --host 127.0.0.1 \
+  --port 9000 \
+  --language zh
+```
+
+If you downloaded `medium`, use:
+
+```bash
+./build/bin/whisper-server \
+  -m models/ggml-medium.bin \
+  --host 127.0.0.1 \
+  --port 9000 \
+  --language zh
+```
+
+Verify Whisper:
+
+```bash
+curl http://127.0.0.1:9000/inference \
+  -F file=@~/whisper.cpp/samples/jfk.wav \
+  -F response_format=json
+```
+
+Important implementation detail:
+
+- The web app records WAV audio now.
+- `/api/transcribe` only accepts WAV MIME types.
+- Voice input is sent to local `whisper-server`, not Google, Claude, or
+  Anthropic.
+- Docker should use `WHISPER_URL=http://host.docker.internal:9000/inference`.
+- Local Next dev can use `WHISPER_URL=http://127.0.0.1:9000/inference`.
+
+### 6. Run the app with Docker
+
+For source/local Docker build:
+
+```bash
+cd ~/Documents/insurance-agent-web
+docker compose --env-file .env up -d --build db app
+```
+
+Run migrations if needed:
+
+```bash
+docker compose --env-file .env exec app npx node-pg-migrate -d DATABASE_URL up
+```
+
+For production image / Mac mini deployment, use:
+
+```bash
+docker compose --env-file .env -f docker-compose.prod.yml up -d db migrate app worker
+```
+
+If using a Cloudflare named tunnel:
+
+```bash
+docker compose --env-file .env -f docker-compose.prod.yml up -d cloudflared
+```
+
+If using a temporary TryCloudflare URL for testing:
+
+```bash
+cloudflared tunnel --url http://localhost:3000
+```
+
+Open:
+
+```text
+http://localhost:3000
+```
+
+Default local login:
+
+```text
+Admin: admin@team.local / Admin@1234
+Agent: agent@team.local / Agent@1234
+```
+
+If the agent account is missing, create it from the admin users page.
+
+### 7. Verify the important features
+
+Run basic checks:
+
+```bash
+curl -I http://localhost:3000
+curl http://localhost:3000/api/push/public-key
+curl http://localhost:11434/api/tags
+curl http://127.0.0.1:9000/inference \
+  -F file=@~/whisper.cpp/samples/jfk.wav \
+  -F response_format=json
+```
+
+Build and test from the repo when dependencies are installed locally:
+
+```bash
+npm install
+npm run build
+TEST_BASE_URL=http://localhost:3000 npm run test:e2e
+```
+
+Manual browser checks:
+
+- `/login` works.
+- `/` loads the agent dashboard.
+- Top-right settings button goes to `/settings`.
+- `/settings` shows VAPID key status and can send a test push after subscription.
+- `/ai` can type a message and attach images/documents.
+- `/ai` voice input records and calls `/api/transcribe`.
+- `/clients/new` voice input records and calls `/api/transcribe`.
+- `/policies/new` can import a text PDF; scanned PDFs use local Ollama Vision.
+- `/search` has a back button and returns results from dashboard search.
+- `/reminders` loads and worker can send due push notifications.
+
+### 8. Web Push / iPhone Safari notes
+
+For real phone notification behavior:
+
+- Must use HTTPS, not plain `http://localhost`.
+- Use Cloudflare Tunnel or another HTTPS domain.
+- iPhone Safari Web Push requires iOS 16.4+.
+- On iPhone, install the site to Home Screen first; normal Safari tabs cannot
+  receive Web Push like a native app.
+- VAPID keys must be set:
+  `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`.
+- After changing VAPID/env values, rebuild or restart the app container.
+
+### 9. AI and PDF size limits to know
+
+AI assistant page (`/ai`):
+
+- PDF/text document upload is capped at `12,000` characters in
+  `app/(agent)/ai/page.tsx`.
+- The frontend reads PDF text with `pdfjs-dist`, stops once accumulated text is
+  over 12,000 characters, and appends a note that only the first 12,000
+  characters were read.
+- If the PDF is scanned and has no embedded text, `/ai` asks the user to upload
+  screenshots/photos instead.
+
+Policy import page (`/policies/new`):
+
+- This is separate from `/ai`.
+- Text PDF extraction is capped at `220,000` characters.
+- Scanned policy PDFs render up to the first 6 pages for local Ollama Vision OCR.
+- Server-side policy parsing also caps text at `220,000` characters before
+  sending sanitized/chunked text to Claude.
+
+### 10. Privacy and model routing
+
+Keep this behavior unless I explicitly ask to change it:
+
+- Voice: browser WAV recording -> `/api/transcribe` -> local Whisper.
+- Image/OCR preprocessing: local Ollama Vision model `qwen2.5vl:7b`.
+- Intent/extraction preprocessing: local Ollama text model `qwen2.5:7b`.
+- Claude model currently used for final AI response / parsing:
+  `claude-haiku-4-5`.
+- PII should be tokenized or scrubbed before Claude wherever the existing code
+  already does that.
+
+### 11. What to report back
+
+When finished, report:
+
+- Current git branch and commit.
+- Whether Docker app is running.
+- Local URL and external HTTPS/tunnel URL if available.
+- Whether Ollama is running and both 7B models are installed.
+- Whether Whisper is running and which model is loaded (`small` or `medium`).
+- Whether VAPID public key is visible from `/api/push/public-key`.
+- Any failing command and the exact reason.
+
+Do not claim success unless you have run the verification commands and read the
+output.
