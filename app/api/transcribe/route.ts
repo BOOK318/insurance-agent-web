@@ -11,21 +11,13 @@ const DEFAULT_WHISPER_URL =
 const WHISPER_URL = process.env.WHISPER_URL ?? DEFAULT_WHISPER_URL;
 const MAX_AUDIO_BYTES = Number(process.env.TRANSCRIBE_MAX_BYTES ?? 25 * 1024 * 1024);
 const ALLOWED_AUDIO_TYPES = new Set([
-  'audio/webm',
   'audio/wav',
   'audio/wave',
   'audio/x-wav',
-  'audio/mp4',
-  'audio/mpeg',
-  'audio/ogg',
-  'audio/x-m4a',
 ]);
 
 function fileNameFor(type: string) {
   if (type.includes('wav')) return 'audio.wav';
-  if (type.includes('mp4') || type.includes('m4a')) return 'audio.m4a';
-  if (type.includes('mpeg')) return 'audio.mp3';
-  if (type.includes('ogg')) return 'audio.ogg';
   return 'audio.webm';
 }
 
@@ -48,7 +40,10 @@ export async function POST(req: NextRequest) {
 
   const contentType = (audio.type || 'audio/webm').split(';')[0];
   if (!ALLOWED_AUDIO_TYPES.has(contentType)) {
-    return NextResponse.json({ error: '錄音格式暫時未支援' }, { status: 400 });
+    return NextResponse.json(
+      { error: '本地 Whisper 目前只支援 WAV 錄音，請重新整理頁面後再錄一次。' },
+      { status: 400 }
+    );
   }
 
   const upstream = new FormData();

@@ -10,8 +10,9 @@ import { test, expect } from '@playwright/test';
  *   4. dashboard search opens the global search page
  *   5. global search returns hits
  *   6. push settings can read and use VAPID config
- *   7. wrong password is rejected
- *   8. unauthenticated request gets bounced to /login
+ *   7. transcribe rejects browser-compressed audio before Whisper
+ *   8. wrong password is rejected
+ *   9. unauthenticated request gets bounced to /login
  */
 
 const AGENT = { email: 'agent@team.local', password: 'Agent@1234' };
@@ -145,6 +146,23 @@ test('push test endpoint accepts the configured VAPID key pair', async ({ reques
   expect(res.ok()).toBeTruthy();
   const json = await res.json() as { sent?: number };
   expect(typeof json.sent).toBe('number');
+});
+
+test('transcribe rejects browser-compressed audio before Whisper', async ({ request }) => {
+  const loginRes = await request.post('/api/auth/login', { data: AGENT });
+  expect(loginRes.ok()).toBeTruthy();
+  const res = await request.post('/api/transcribe', {
+    multipart: {
+      audio: {
+        name: 'recording.m4a',
+        mimeType: 'audio/mp4',
+        buffer: Buffer.from([0, 1, 2, 3]),
+      },
+    },
+  });
+  expect(res.status()).toBe(400);
+  const json = await res.json() as { error?: string };
+  expect(json.error).toContain('WAV');
 });
 
 test('wrong password is rejected', async ({ page }) => {

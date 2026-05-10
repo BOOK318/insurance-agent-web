@@ -2,6 +2,7 @@
 import { useState, useRef, useEffect, Suspense } from 'react';
 import { Send, Loader2, ArrowLeft, Sparkles, Mic, MicOff, Camera, X } from 'lucide-react';
 import { useSearchParams, useRouter } from 'next/navigation';
+import { startWavRecording, type WavRecorder } from '../../../lib/wav-recorder';
 
 // Web Speech API type declarations
 declare global {
@@ -78,9 +79,7 @@ function AIChat() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
-  const recorderRef = useRef<MediaRecorder | null>(null);
-  const recordingStreamRef = useRef<MediaStream | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
+  const recorderRef = useRef<WavRecorder | null>(null);
 
   useEffect(() => {
     fetch('/api/ai')
@@ -120,56 +119,22 @@ function AIChat() {
   // ── Voice Input ──────────────────────────────────────────
   async function toggleRecording() {
     if (recording) {
-      if (recorderRef.current && recorderRef.current.state !== 'inactive') {
-        recorderRef.current.stop();
+      const recorder = recorderRef.current;
+      if (recorder) {
+        recorderRef.current = null;
+        setRecording(false);
+        await transcribeStoppedRecording(recorder.stop());
+        return;
       }
       recognitionRef.current?.stop();
       setRecording(false);
       return;
     }
 
-    if (navigator.mediaDevices?.getUserMedia && typeof MediaRecorder !== 'undefined') {
+    if (navigator.mediaDevices?.getUserMedia) {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        const mimeType = getSupportedAudioMimeType();
-        const recorder = mimeType
-          ? new MediaRecorder(stream, { mimeType })
-          : new MediaRecorder(stream);
+        const recorder = await startWavRecording();
         recorderRef.current = recorder;
-        recordingStreamRef.current = stream;
-        audioChunksRef.current = [];
-
-        recorder.ondataavailable = event => {
-          if (event.data.size > 0) audioChunksRef.current.push(event.data);
-        };
-        recorder.onerror = () => {
-          stopLocalRecordingStream();
-          setRecording(false);
-          setVoicePreview('');
-          alert('錄音失敗，請再試一次');
-        };
-        recorder.onstop = async () => {
-          stopLocalRecordingStream();
-          setRecording(false);
-          const chunks = audioChunksRef.current;
-          audioChunksRef.current = [];
-          if (chunks.length === 0) {
-            setVoicePreview('');
-            return;
-          }
-          setVoicePreview('本地 Whisper 轉錄中…');
-          try {
-            const audio = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
-            const transcript = await transcribeAudio(audio);
-            if (transcript) setInput(prev => prev ? `${prev} ${transcript}` : transcript);
-          } catch (err) {
-            alert(err instanceof Error ? err.message : '本地 Whisper 轉錄失敗');
-          } finally {
-            setVoicePreview('');
-          }
-        };
-
-        recorder.start();
         setRecording(true);
         setVoicePreview('本地錄音中…');
         return;
@@ -210,10 +175,21 @@ function AIChat() {
     setVoicePreview('');
   }
 
-  function stopLocalRecordingStream() {
-    recordingStreamRef.current?.getTracks().forEach(track => track.stop());
-    recordingStreamRef.current = null;
-    recorderRef.current = null;
+  async function transcribeStoppedRecording(audioPromise: Promise<Blob>) {
+    setVoicePreview('本地 Whisper 轉錄中…');
+    try {
+      const audio = await audioPromise;
+      if (audio.size <= 44) {
+        setVoicePreview('');
+        return;
+      }
+      const transcript = await transcribeAudio(audio);
+      if (transcript) setInput(prev => prev ? `${prev} ${transcript}` : transcript);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : '本地 Whisper 轉錄失敗');
+    } finally {
+      setVoicePreview('');
+    }
   }
 
   // ── Document Scan ────────────────────────────────────────
@@ -579,19 +555,9 @@ function fileToBase64(file: File): Promise<string> {
   });
 }
 
-function getSupportedAudioMimeType() {
-  const candidates = [
-    'audio/webm;codecs=opus',
-    'audio/webm',
-    'audio/mp4',
-    'audio/ogg;codecs=opus',
-  ];
-  return candidates.find(type => MediaRecorder.isTypeSupported(type)) ?? '';
-}
-
 async function transcribeAudio(audio: Blob) {
   const form = new FormData();
-  form.append('audio', audio, 'recording.webm');
+  form.append('audio', audio, 'recording.wav');
   const res = await fetch('/api/transcribe', {
     method: 'POST',
     body: form,
