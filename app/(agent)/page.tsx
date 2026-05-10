@@ -2,7 +2,8 @@ import React from 'react';
 import { getSession } from '../../lib/auth';
 import { db } from '../../lib/db';
 import Link from 'next/link';
-import { Users, FileText, AlertCircle, Bell } from 'lucide-react';
+import { Users, FileText, AlertCircle, Bell, Settings } from 'lucide-react';
+import { DashboardSearch } from './dashboard-search';
 
 export default async function AgentDashboard() {
   const user = await getSession();
@@ -35,8 +36,21 @@ export default async function AgentDashboard() {
 
   return (
     <div>
-      <h1 className="text-xl font-bold mb-0.5">主頁</h1>
-      <p className="text-gray-400 text-sm mb-5">你好，{user.name} 👋</p>
+      <div className="flex items-start justify-between gap-3 mb-3">
+        <div className="min-w-0">
+          <h1 className="text-xl font-bold mb-0.5">主頁</h1>
+          <p className="text-gray-400 text-sm">你好，{user.name} 👋</p>
+        </div>
+        <Link
+          href="/settings"
+          aria-label="設定"
+          className="shrink-0 w-10 h-10 rounded-xl bg-white border border-gray-100 shadow-sm text-gray-600 flex items-center justify-center hover:bg-gray-50 hover:text-blue-700 transition"
+        >
+          <Settings size={18} />
+        </Link>
+      </div>
+
+      <DashboardSearch />
 
       <div className="grid grid-cols-2 gap-3 mb-5">
         {stats.map(s => (

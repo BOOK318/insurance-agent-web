@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { LayoutDashboard, Users, FileText, AlertCircle, Bell, MessageSquare, LogOut } from 'lucide-react';
+import { LayoutDashboard, Users, FileText, AlertCircle, Bell, Search, MessageSquare, LogOut } from 'lucide-react';
 import { cn } from '../lib/utils';
 import type { User } from '../lib/db';
 
@@ -11,8 +11,11 @@ const links = [
   { href: '/policies', label: '保單', icon: FileText },
   { href: '/claims', label: 'Claim', icon: AlertCircle },
   { href: '/reminders', label: '提醒', icon: Bell },
+  { href: '/search', label: '搜尋', icon: Search },
   { href: '/ai', label: 'AI助手', icon: MessageSquare },
 ];
+
+const mobileLinks = links.filter(link => link.href !== '/search');
 
 export function AgentNav({ user }: { user: User }) {
   const path = usePathname();
@@ -58,8 +61,8 @@ export function AgentNav({ user }: { user: User }) {
 
       {/* 手機底部導航 */}
       {!hideMobileNav && (
-      <nav className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur border-t border-gray-200 flex md:hidden z-50 pb-[calc(0.35rem+env(safe-area-inset-bottom))] pt-1.5">
-        {links.map(({ href, label, icon: Icon }) => (
+      <nav aria-label="手機主導航" className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur border-t border-gray-200 flex md:hidden z-50 pb-[calc(0.35rem+env(safe-area-inset-bottom))] pt-1.5">
+        {mobileLinks.map(({ href, label, icon: Icon }) => (
           <Link key={href} href={href}
             className={cn('flex-1 flex flex-col items-center justify-center text-[10px] leading-none gap-1 min-h-11',
               isActive(href) ? 'text-blue-700 font-semibold' : 'text-gray-500')}>

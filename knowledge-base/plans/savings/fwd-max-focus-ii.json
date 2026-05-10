@@ -1,0 +1,47 @@
+{
+  "company": "FWD",
+  "company_zh": "富衛人壽保險（百慕達）有限公司",
+  "product_name": "Max Focus II Insurance Plan",
+  "product_name_zh": "盈聚·天下 II 保險計劃",
+  "category": "savings",
+  "currency": "USD",
+  "quote_profile": { "age": 30, "gender": "M", "smoker": false },
+  "premium": {
+    "monthly": 1299.96,
+    "monthly_with_levy": 1301.26,
+    "annual_equivalent": 15599,
+    "payment_term_years": 5,
+    "total_premium_paid": 77997
+  },
+  "policy_term": "Whole life",
+  "nominal_amount": 14444,
+  "additional_benefits": {
+    "accidental_death_benefit": 28888,
+    "accidental_death_benefit_term_years": 10
+  },
+  "surrender_value_table": [
+    { "year": 1,  "total_paid": 15599, "guaranteed": 0,     "non_guaranteed_reversionary": 0,     "non_guaranteed_special": 0,     "total_surrender": 0 },
+    { "year": 2,  "total_paid": 31199, "guaranteed": 0,     "non_guaranteed_reversionary": 346,   "non_guaranteed_special": 0,     "total_surrender": 346 },
+    { "year": 3,  "total_paid": 46798, "guaranteed": 3859,  "non_guaranteed_reversionary": 2082,  "non_guaranteed_special": 12652, "total_surrender": 18593 },
+    { "year": 4,  "total_paid": 62398, "guaranteed": 10836, "non_guaranteed_reversionary": 3832,  "non_guaranteed_special": 13360, "total_surrender": 28028 },
+    { "year": 5,  "total_paid": 77997, "guaranteed": 20485, "non_guaranteed_reversionary": 5596,  "non_guaranteed_special": 16856, "total_surrender": 42937 },
+    { "year": 10, "total_paid": 77997, "guaranteed": 45573, "non_guaranteed_reversionary": 14630, "non_guaranteed_special": 35228, "total_surrender": 95431 },
+    { "year": 15, "total_paid": 77997, "guaranteed": 56518, "non_guaranteed_reversionary": 24031, "non_guaranteed_special": 55956, "total_surrender": 136505 },
+    { "year": 20, "total_paid": 77997, "guaranteed": 72418, "non_guaranteed_reversionary": 33813, "non_guaranteed_special": 100602,"total_surrender": 206833 },
+    { "year": 25, "total_paid": 77997, "guaranteed": 73055, "non_guaranteed_reversionary": 44008, "non_guaranteed_special": 163757,"total_surrender": 280820 },
+    { "year": 30, "total_paid": 77997, "guaranteed": 73691, "non_guaranteed_reversionary": 54886, "non_guaranteed_special": 252499,"total_surrender": 381076 }
+  ],
+  "xray": {
+    "breakeven_year_guaranteed": "30年都未回本",
+    "breakeven_year_projected": "~8-9年",
+    "year3_surrender_loss_pct": 60.3,
+    "year3_surrender_loss_usd": 28205,
+    "year5_surrender_loss_pct": 44.9,
+    "year5_surrender_loss_usd": 35060,
+    "guaranteed_irr_20y": "負數",
+    "projected_irr_20y": "~5.0%",
+    "total_non_guaranteed_ratio_20y": 65.0
+  },
+  "source_pdf": "raw-pdfs/FWD Max Focus II Monthly 1300USD Sample.pdf",
+  "quote_date": "2026-05-09"
+}

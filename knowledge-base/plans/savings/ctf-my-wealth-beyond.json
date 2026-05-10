@@ -1,0 +1,44 @@
+{
+  "company": "CTF Life",
+  "company_zh": "周大福人壽保險有限公司",
+  "product_name": "My Wealth Beyond Savings Plan",
+  "product_name_zh": "匠心·飛越儲蓄保險計劃",
+  "category": "savings",
+  "currency": "USD",
+  "quote_profile": { "age": 30, "gender": "M", "smoker": false },
+  "premium": {
+    "monthly": 1300.01,
+    "monthly_with_levy": 1301.31,
+    "annual_equivalent": 15600,
+    "payment_term_years": 5,
+    "total_premium_paid": 78001
+  },
+  "policy_term": "To age 128",
+  "initial_units": 144445,
+  "additional_benefits": { "premium_waiver": true },
+  "surrender_value_table": [
+    { "year": 1,  "total_paid": 15600, "guaranteed": 0,     "non_guaranteed_reversionary": 144,   "non_guaranteed_terminal": 79,     "total_surrender": 223 },
+    { "year": 2,  "total_paid": 31200, "guaranteed": 124,   "non_guaranteed_reversionary": 434,   "non_guaranteed_terminal": 124,    "total_surrender": 682 },
+    { "year": 3,  "total_paid": 46800, "guaranteed": 508,   "non_guaranteed_reversionary": 723,   "non_guaranteed_terminal": 529,    "total_surrender": 1760 },
+    { "year": 4,  "total_paid": 62400, "guaranteed": 776,   "non_guaranteed_reversionary": 1304,  "non_guaranteed_terminal": 2093,   "total_surrender": 4173 },
+    { "year": 5,  "total_paid": 78001, "guaranteed": 946,   "non_guaranteed_reversionary": 5531,  "non_guaranteed_terminal": 13626,  "total_surrender": 20103 },
+    { "year": 10, "total_paid": 78001, "guaranteed": 57180, "non_guaranteed_reversionary": 19347, "non_guaranteed_terminal": 19019,  "total_surrender": 95546 },
+    { "year": 15, "total_paid": 78001, "guaranteed": 72367, "non_guaranteed_reversionary": 29413, "non_guaranteed_terminal": 35291,  "total_surrender": 137071 },
+    { "year": 20, "total_paid": 78001, "guaranteed": 72728, "non_guaranteed_reversionary": 37559, "non_guaranteed_terminal": 96785,  "total_surrender": 207072 },
+    { "year": 25, "total_paid": 78001, "guaranteed": 73089, "non_guaranteed_reversionary": 45898, "non_guaranteed_terminal": 189779, "total_surrender": 308766 },
+    { "year": 30, "total_paid": 78001, "guaranteed": 73450, "non_guaranteed_reversionary": 53831, "non_guaranteed_terminal": 295562, "total_surrender": 422843 }
+  ],
+  "xray": {
+    "breakeven_year_guaranteed": "30年都未回本",
+    "breakeven_year_projected": "~8-9年",
+    "year3_surrender_loss_pct": 96.2,
+    "year3_surrender_loss_usd": 45040,
+    "year5_surrender_loss_pct": 74.2,
+    "year5_surrender_loss_usd": 57898,
+    "guaranteed_irr_20y": "負數",
+    "projected_irr_20y": "~5.0%",
+    "total_non_guaranteed_ratio_20y": 64.9
+  },
+  "source_pdf": "raw-pdfs/CTF My Wealth Beyond Monthly 1300 USD.pdf",
+  "quote_date": "2026-05-09"
+}

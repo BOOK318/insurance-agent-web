@@ -2,8 +2,6 @@
 import { useEffect, useState } from 'react';
 import { Bell, BellOff, Send, Loader2 } from 'lucide-react';
 
-const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? '';
-
 function urlBase64ToUint8Array(b64: string) {
   const padding = '='.repeat((4 - (b64.length % 4)) % 4);
   const base64 = (b64 + padding).replace(/-/g, '+').replace(/_/g, '/');
@@ -13,11 +11,35 @@ function urlBase64ToUint8Array(b64: string) {
   return out;
 }
 
+function bufferSourceToUint8Array(source: BufferSource) {
+  if (source instanceof ArrayBuffer) return new Uint8Array(source);
+  return new Uint8Array(source.buffer, source.byteOffset, source.byteLength);
+}
+
+function subscriptionUsesPublicKey(subscription: PushSubscription, publicKey: string) {
+  const applicationServerKey = subscription.options.applicationServerKey;
+  if (!applicationServerKey) return true;
+
+  const expected = urlBase64ToUint8Array(publicKey);
+  const actual = bufferSourceToUint8Array(applicationServerKey);
+  return expected.length === actual.length && expected.every((byte, index) => byte === actual[index]);
+}
+
+async function forgetSubscription(subscription: PushSubscription) {
+  await fetch('/api/push/subscribe', {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ endpoint: subscription.endpoint }),
+  }).catch(() => {});
+  await subscription.unsubscribe();
+}
+
 export function PushSettings() {
   const [supported, setSupported] = useState(true);
   const [permission, setPermission] = useState<NotificationPermission>('default');
   const [subscribed, setSubscribed] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [publicKey, setPublicKey] = useState('');
   const [msg, setMsg] = useState<{ type: 'ok' | 'err' | 'info'; text: string } | null>(null);
 
   useEffect(() => {
@@ -25,16 +47,33 @@ export function PushSettings() {
       setSupported(false);
       return;
     }
-    setPermission(Notification.permission);
-    navigator.serviceWorker.getRegistration('/sw.js').then(reg => {
-      reg?.pushManager.getSubscription().then(s => setSubscribed(!!s));
-    });
+    let cancelled = false;
+    async function loadState() {
+      setPermission(Notification.permission);
+      const keyRes = await fetch('/api/push/public-key');
+      const data = keyRes.ok ? await keyRes.json() as { publicKey?: string } : null;
+      const key = data?.publicKey ?? '';
+      if (cancelled) return;
+      setPublicKey(key);
+
+      const reg = await navigator.serviceWorker.getRegistration('/sw.js');
+      const sub = await reg?.pushManager.getSubscription();
+      if (cancelled) return;
+      if (sub && key && !subscriptionUsesPublicKey(sub, key)) {
+        await forgetSubscription(sub);
+        if (!cancelled) setSubscribed(false);
+        return;
+      }
+      setSubscribed(!!sub);
+    }
+    loadState().catch(() => setPublicKey(''));
+    return () => { cancelled = true; };
   }, []);
 
   async function enable() {
     setBusy(true); setMsg(null);
     try {
-      if (!VAPID_PUBLIC_KEY) throw new Error('VAPID public key 未設定');
+      if (!publicKey) throw new Error('VAPID public key 未設定');
       const reg = await navigator.serviceWorker.register('/sw.js');
       await navigator.serviceWorker.ready;
 
@@ -45,9 +84,12 @@ export function PushSettings() {
         return;
       }
 
+      const existing = await reg.pushManager.getSubscription();
+      if (existing) await forgetSubscription(existing);
+
       const sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+        applicationServerKey: urlBase64ToUint8Array(publicKey),
       });
       const res = await fetch('/api/push/subscribe', {
         method: 'POST',
@@ -68,12 +110,7 @@ export function PushSettings() {
       const reg = await navigator.serviceWorker.getRegistration('/sw.js');
       const sub = await reg?.pushManager.getSubscription();
       if (sub) {
-        await fetch('/api/push/subscribe', {
-          method: 'DELETE',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ endpoint: sub.endpoint }),
-        });
-        await sub.unsubscribe();
+        await forgetSubscription(sub);
       }
       setSubscribed(false);
       setMsg({ type: 'info', text: '已關閉通知' });

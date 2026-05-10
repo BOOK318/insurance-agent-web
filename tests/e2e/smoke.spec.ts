@@ -7,9 +7,11 @@ import { test, expect } from '@playwright/test';
  *   1. login → land on dashboard
  *   2. agent dashboard renders
  *   3. clients list renders
- *   4. global search returns hits
- *   5. wrong password is rejected
- *   6. unauthenticated request gets bounced to /login
+ *   4. dashboard search opens the global search page
+ *   5. global search returns hits
+ *   6. push settings can read and use VAPID config
+ *   7. wrong password is rejected
+ *   8. unauthenticated request gets bounced to /login
  */
 
 const AGENT = { email: 'agent@team.local', password: 'Agent@1234' };
@@ -73,6 +75,9 @@ test('agent can log in and see the dashboard', async ({ page }) => {
   await login(page, AGENT);
   await page.waitForURL(/\/(?:$|\?)/);  // root
   await expect(page.getByRole('heading', { name: '主頁' })).toBeVisible();
+  await page.getByRole('link', { name: '設定' }).click();
+  await page.waitForURL('**/settings', { timeout: 10000 });
+  await expect(page.getByRole('heading', { name: '通知設定' })).toBeVisible();
 });
 
 test('clients list renders for agent', async ({ page }) => {
@@ -84,6 +89,35 @@ test('clients list renders for agent', async ({ page }) => {
   await expect(page.locator('h1', { hasText: '我的客戶' })).toBeVisible({ timeout: 10000 });
 });
 
+test('agent can search from the dashboard shortcut', async ({ page }) => {
+  await login(page, AGENT);
+  await page.waitForURL(/\/(?:$|\?)/, { timeout: 10000 });
+  await page.getByLabel('主頁快速搜尋').fill('陳家');
+  await page.getByRole('button', { name: '搜尋' }).click();
+  await expect(page).toHaveURL(/\/search\?q=/);
+  await expect(page.getByRole('heading', { name: '搜尋' })).toBeVisible();
+  await expect(page.getByLabel('搜尋關鍵字')).toHaveValue('陳家');
+  await expect(page.getByText('陳家俊')).toBeVisible();
+});
+
+test('search page has a back button to the dashboard', async ({ page }) => {
+  await login(page, AGENT);
+  await page.waitForURL(/\/(?:$|\?)/, { timeout: 10000 });
+  await page.goto('/search?q=' + encodeURIComponent('陳家'));
+  await page.getByRole('link', { name: '返回主頁' }).click();
+  await page.waitForURL(/\/(?:$|\?)/, { timeout: 10000 });
+  await expect(page.getByRole('heading', { name: '主頁' })).toBeVisible();
+});
+
+test('mobile bottom navigation does not include search', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await login(page, AGENT);
+  await page.waitForURL(/\/(?:$|\?)/, { timeout: 10000 });
+  const mobileNav = page.getByRole('navigation', { name: '手機主導航' });
+  await expect(mobileNav).toBeVisible();
+  await expect(mobileNav.getByRole('link', { name: /搜尋/ })).toHaveCount(0);
+});
+
 test('global search returns the seeded client', async ({ page, request }) => {
   // Login via the API, then call /api/search with the cookie
   const res = await request.post('/api/auth/login', { data: AGENT });
@@ -93,6 +127,24 @@ test('global search returns the seeded client', async ({ page, request }) => {
   const json = await search.json();
   expect(json.hits.length).toBeGreaterThan(0);
   expect(json.hits.some((h: { kind: string }) => h.kind === 'client')).toBeTruthy();
+});
+
+test('push settings can read the runtime VAPID public key', async ({ request }) => {
+  const loginRes = await request.post('/api/auth/login', { data: AGENT });
+  expect(loginRes.ok()).toBeTruthy();
+  const res = await request.get('/api/push/public-key');
+  expect(res.ok()).toBeTruthy();
+  const json = await res.json() as { publicKey?: string };
+  expect(json.publicKey).toBeTruthy();
+});
+
+test('push test endpoint accepts the configured VAPID key pair', async ({ request }) => {
+  const loginRes = await request.post('/api/auth/login', { data: AGENT });
+  expect(loginRes.ok()).toBeTruthy();
+  const res = await request.post('/api/push/test');
+  expect(res.ok()).toBeTruthy();
+  const json = await res.json() as { sent?: number };
+  expect(typeof json.sent).toBe('number');
 });
 
 test('wrong password is rejected', async ({ page }) => {

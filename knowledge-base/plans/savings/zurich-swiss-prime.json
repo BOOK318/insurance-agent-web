@@ -1,0 +1,43 @@
+{
+  "company": "Zurich",
+  "company_zh": "蘇黎世人壽保險（香港）有限公司",
+  "product_name": "Swiss Prime Savings Plan",
+  "product_name_zh": "瑞盈儲蓄保險計劃",
+  "category": "savings",
+  "currency": "USD",
+  "quote_profile": { "age": 30, "gender": "M", "smoker": false },
+  "premium": {
+    "monthly": 1300.00,
+    "monthly_with_levy": 1301.30,
+    "annual_equivalent": 15600,
+    "payment_term_years": 5,
+    "total_premium_paid": 78000
+  },
+  "policy_term": "To age 128",
+  "nominal_amount": 72222,
+  "surrender_value_table": [
+    { "year": 1,  "total_paid": 15600, "guaranteed": 867,  "non_guaranteed_terminal_bonus": 298,    "total_surrender": 1165 },
+    { "year": 2,  "total_paid": 31200, "guaranteed": 1878, "non_guaranteed_terminal_bonus": 748,    "total_surrender": 2626 },
+    { "year": 3,  "total_paid": 46800, "guaranteed": 3178, "non_guaranteed_terminal_bonus": 1342,   "total_surrender": 4520 },
+    { "year": 4,  "total_paid": 62400, "guaranteed": 5056, "non_guaranteed_terminal_bonus": 2229,   "total_surrender": 7285 },
+    { "year": 5,  "total_paid": 78000, "guaranteed": 8378, "non_guaranteed_terminal_bonus": 3444,   "total_surrender": 11822 },
+    { "year": 10, "total_paid": 78000, "guaranteed": 48533,"non_guaranteed_terminal_bonus": 43034,  "total_surrender": 91567 },
+    { "year": 15, "total_paid": 78000, "guaranteed": 63303,"non_guaranteed_terminal_bonus": 91265,  "total_surrender": 154568 },
+    { "year": 20, "total_paid": 78000, "guaranteed": 72442,"non_guaranteed_terminal_bonus": 137969, "total_surrender": 210411 },
+    { "year": 25, "total_paid": 78000, "guaranteed": 72877,"non_guaranteed_terminal_bonus": 210274, "total_surrender": 283151 },
+    { "year": 30, "total_paid": 78000, "guaranteed": 73439,"non_guaranteed_terminal_bonus": 308549, "total_surrender": 381988 }
+  ],
+  "xray": {
+    "breakeven_year_guaranteed": "30年都未回本",
+    "breakeven_year_projected": "~8-9年",
+    "year3_surrender_loss_pct": 90.3,
+    "year3_surrender_loss_usd": 42280,
+    "year5_surrender_loss_pct": 84.8,
+    "year5_surrender_loss_usd": 66178,
+    "guaranteed_irr_20y": "負數",
+    "projected_irr_20y": "~5.1%",
+    "total_non_guaranteed_ratio_20y": 65.6
+  },
+  "source_pdf": "raw-pdfs/Zurich Swiss Prime Monthly 1300USD.pdf",
+  "quote_date": "2026-05-09"
+}

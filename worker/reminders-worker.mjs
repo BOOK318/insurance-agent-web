@@ -44,6 +44,13 @@ async function getSubscriptions(userId) {
   return rows;
 }
 
+function isDeadSubscriptionError(err) {
+  if (err?.statusCode === 404 || err?.statusCode === 410) return true;
+  return err?.statusCode === 400
+    && typeof err?.body === 'string'
+    && err.body.includes('VapidPkHashMismatch');
+}
+
 async function sendToUser(userId, payload) {
   const subs = await getSubscriptions(userId);
   const json = JSON.stringify(payload);
@@ -55,7 +62,7 @@ async function sendToUser(userId, payload) {
       );
     } catch (err) {
       const code = err?.statusCode;
-      if (code === 404 || code === 410) {
+      if (isDeadSubscriptionError(err)) {
         await pool.query('DELETE FROM push_subscriptions WHERE id = $1', [s.id]).catch(() => {});
       } else {
         console.error('[worker] push send error', code, err?.body ?? err?.message);

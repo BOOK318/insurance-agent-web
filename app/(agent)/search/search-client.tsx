@@ -17,8 +17,8 @@ const KIND_META: Record<Hit['kind'], { label: string; icon: typeof Users; tone: 
   claim:  { label: 'Claim', icon: Stethoscope, tone: 'bg-amber-50 text-amber-800' },
 };
 
-export function SearchClient() {
-  const [q, setQ] = useState('');
+export function SearchClient({ initialQuery = '' }: { initialQuery?: string }) {
+  const [q, setQ] = useState(initialQuery);
   const [hits, setHits] = useState<Hit[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -45,6 +45,7 @@ export function SearchClient() {
       <div className="relative mb-4">
         <SearchIcon size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
         <input
+          aria-label="搜尋關鍵字"
           autoFocus
           value={q}
           onChange={e => setQ(e.target.value)}

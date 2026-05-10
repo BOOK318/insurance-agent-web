@@ -28,6 +28,14 @@ export type PushPayload = {
   tag?: string;
 };
 
+function isDeadSubscriptionError(err: unknown) {
+  const pushError = err as { statusCode?: number; body?: unknown };
+  if (pushError.statusCode === 404 || pushError.statusCode === 410) return true;
+  return pushError.statusCode === 400
+    && typeof pushError.body === 'string'
+    && pushError.body.includes('VapidPkHashMismatch');
+}
+
 /** Send to every subscription belonging to a user. Removes dead subscriptions. */
 export async function sendPushToUser(userId: string, payload: PushPayload) {
   ensureConfigured();
@@ -51,8 +59,8 @@ export async function sendPushToUser(userId: string, payload: PushPayload) {
       ).catch(() => {});
     } catch (err) {
       const code = (err as { statusCode?: number }).statusCode;
-      // 404 / 410 = subscription is gone (browser revoked, app uninstalled)
-      if (code === 404 || code === 410) {
+      // 404 / 410 = subscription is gone. VapidPkHashMismatch = old key pair.
+      if (isDeadSubscriptionError(err)) {
         await db.query('DELETE FROM push_subscriptions WHERE id = $1', [sub.id]).catch(() => {});
       } else {
         console.error('[push] send error', code, err);
