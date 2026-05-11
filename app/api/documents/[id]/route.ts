@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Readable } from 'stream';
 import { getSession } from '../../../../lib/auth';
 import { db } from '../../../../lib/db';
-import { streamDocument } from '../../../../lib/document-storage';
+import { INLINE_SAFE_MIME_TYPES, streamDocument } from '../../../../lib/document-storage';
 
 export const runtime = 'nodejs';
 
@@ -36,10 +36,13 @@ export async function GET(req: NextRequest, { params }: Params) {
 
   // RFC5987-encode for non-ASCII filenames (CJK names are common here)
   const utf8Name = encodeURIComponent(doc.file_name);
+  const shouldPreview =
+    req.nextUrl.searchParams.get('download') !== '1' &&
+    INLINE_SAFE_MIME_TYPES.has(doc.mime_type);
   const disposition =
-    req.nextUrl.searchParams.get('download') === '1'
-      ? `attachment; filename*=UTF-8''${utf8Name}`
-      : `inline; filename*=UTF-8''${utf8Name}`;
+    shouldPreview
+      ? `inline; filename*=UTF-8''${utf8Name}`
+      : `attachment; filename*=UTF-8''${utf8Name}`;
 
   return new NextResponse(webStream, {
     headers: {
@@ -47,6 +50,7 @@ export async function GET(req: NextRequest, { params }: Params) {
       'Content-Length': String(doc.size_bytes),
       'Content-Disposition': disposition,
       'Cache-Control': 'private, no-store',
+      'X-Content-Type-Options': 'nosniff',
     },
   });
 }

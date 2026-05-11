@@ -5,6 +5,7 @@ import {
   ALLOWED_MIME_TYPES,
   MAX_DOCUMENT_BYTES,
   buildStorageKey,
+  isValidDocumentContentType,
   writeDocument,
   sanitizeFileName,
 } from '../../../lib/document-storage';
@@ -70,7 +71,8 @@ export async function POST(req: NextRequest) {
   if (!clientId && !policyId && !claimId) {
     return NextResponse.json({ error: '至少要綁定一個客戶 / 保單 / Claim' }, { status: 400 });
   }
-  if (!ALLOWED_MIME_TYPES.has(file.type)) {
+  const mimeType = (file.type || '').split(';')[0].toLowerCase();
+  if (!ALLOWED_MIME_TYPES.has(mimeType)) {
     return NextResponse.json({ error: `唔支援嘅檔案類型：${file.type || '未知'}` }, { status: 400 });
   }
   if (file.size <= 0) {
@@ -111,6 +113,9 @@ export async function POST(req: NextRequest) {
   const storageKey = buildStorageKey(user.id, docId, safeName);
 
   const buffer = Buffer.from(await file.arrayBuffer());
+  if (!isValidDocumentContentType(buffer, mimeType)) {
+    return NextResponse.json({ error: '檔案內容同檔案類型唔相符，請確認檔案後再上傳。' }, { status: 400 });
+  }
   const { sha256, size } = await writeDocument(storageKey, buffer);
 
   try {
@@ -121,7 +126,7 @@ export async function POST(req: NextRequest) {
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
        RETURNING id, title, file_name, mime_type, size_bytes, client_id, policy_id, claim_id, notes, created_at`,
       [docId, user.id, clientId, policyId, claimId,
-       title, safeName, file.type, size, storageKey, sha256, notes]
+       title, safeName, mimeType, size, storageKey, sha256, notes]
     );
     return NextResponse.json(rows[0], { status: 201 });
   } catch (err) {
