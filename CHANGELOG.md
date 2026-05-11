@@ -2,6 +2,7 @@
 
 ## 2026-05-12
 
+- Security: disabled the framework `X-Powered-By` response header.
 - Security: moved login throttling from process memory into a durable Postgres-backed `login_attempts` table.
 - Security: encrypted admin-managed settings at rest and added audit events for settings updates and deletion.
 - Security: added app-wide CSP, HSTS, frame, referrer, MIME sniffing, DNS prefetch, and permissions-policy headers.

@@ -12,6 +12,7 @@ try {
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
+  poweredByHeader: false,
   allowedDevOrigins,
   async headers() {
     const csp = [
