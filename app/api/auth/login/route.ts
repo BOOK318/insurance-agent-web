@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: '帳號或密碼錯誤' }, { status: 401 });
   }
 
-  const block = getLoginBlock(req, normalizedEmail);
+  const block = await getLoginBlock(req, normalizedEmail);
   if (block) {
     await writeAuditLog({
       action: 'auth.login.blocked',
@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
 
   const user = await getUserByEmail(normalizedEmail);
   if (!user) {
-    const failure = recordLoginFailure(req, normalizedEmail);
+    const failure = await recordLoginFailure(req, normalizedEmail);
     await writeAuditLog({
       action: 'auth.login.failed',
       metadata: { email: normalizedEmail, reason: 'unknown_user', failures: failure.failures },
@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
 
   const valid = await bcrypt.compare(rawPassword, user.password_hash);
   if (!valid) {
-    const failure = recordLoginFailure(req, normalizedEmail);
+    const failure = await recordLoginFailure(req, normalizedEmail);
     await writeAuditLog({
       actorUserId: user.id,
       action: 'auth.login.failed',
@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: '帳號或密碼錯誤' }, { status: 401, headers });
   }
 
-  recordLoginSuccess(req, normalizedEmail);
+  await recordLoginSuccess(req, normalizedEmail);
   await setSession(user);
   await writeAuditLog({
     actorUserId: user.id,

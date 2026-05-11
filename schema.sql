@@ -139,6 +139,15 @@ CREATE TABLE conversations (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Durable login throttling (key is sha256(ip + email), not plaintext PII)
+CREATE TABLE login_attempts (
+  key TEXT PRIMARY KEY,
+  first_failure_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  failures INTEGER NOT NULL DEFAULT 0,
+  locked_until TIMESTAMPTZ,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- Indexes
 CREATE INDEX idx_clients_agent ON clients(agent_id);
 CREATE INDEX idx_clients_dob ON clients(dob);
@@ -146,6 +155,8 @@ CREATE INDEX idx_policies_agent ON policies(agent_id);
 CREATE INDEX idx_policies_expiry ON policies(expiry_date);
 CREATE INDEX idx_claims_agent ON claims(agent_id);
 CREATE INDEX idx_reminders_agent ON reminders(agent_id, remind_at, is_sent);
+CREATE INDEX idx_login_attempts_locked ON login_attempts(locked_until);
+CREATE INDEX idx_login_attempts_first_failure ON login_attempts(first_failure_at);
 
 -- 預設Admin帳號（密碼: Admin@1234，第一次login後要改）
 -- 密碼hash係用bcryptjs生成（cost=10）
