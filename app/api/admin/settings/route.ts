@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '../../../../lib/auth';
 import { setSetting } from '../../../../lib/settings';
 import { db } from '../../../../lib/db';
+import { writeAuditLog } from '../../../../lib/audit';
+import { getClientIp } from '../../../../lib/security';
 
 const ALLOWED_KEYS = new Set(['ANTHROPIC_API_KEY']);
 
@@ -21,6 +23,14 @@ export async function POST(req: NextRequest) {
   }
 
   await setSetting(key, value);
+  await writeAuditLog({
+    actorUserId: user.id,
+    action: 'admin.setting.updated',
+    targetType: 'setting',
+    metadata: { key },
+    ip: getClientIp(req),
+    userAgent: req.headers.get('user-agent'),
+  });
   return NextResponse.json({ ok: true });
 }
 
@@ -35,5 +45,13 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: 'Unsupported key' }, { status: 400 });
   }
   await db.query('DELETE FROM settings WHERE key = $1', [key]);
+  await writeAuditLog({
+    actorUserId: user.id,
+    action: 'admin.setting.deleted',
+    targetType: 'setting',
+    metadata: { key },
+    ip: getClientIp(req),
+    userAgent: req.headers.get('user-agent'),
+  });
   return NextResponse.json({ ok: true });
 }

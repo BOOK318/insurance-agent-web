@@ -72,6 +72,20 @@ HKID_ENCRYPTION_KEY=<base64-string>
 
 ⚠️ **唔好將呢條 key commit 入 git**，要喺 `.env` 入面，每部 Mac mini 一條。掉咗就所有 HKID 解唔返。可以同 `JWT_SECRET` 一齊存喺公司密碼管理器。
 
+### Admin settings secret
+
+`settings.value` 會由 application 用 AES-256-GCM 加密後先寫入 Postgres，主要保護 admin UI 入面更新嘅 `ANTHROPIC_API_KEY`。
+
+預設會用 `JWT_SECRET` 派生加密 key；如果想同登入 token secret 分開輪換，可以額外設定：
+
+```bash
+# 生成一次：
+#   node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
+SETTINGS_ENCRYPTION_KEY=<base64url-string>
+```
+
+舊有 plaintext `settings` row 仍然可讀；下一次 admin 儲存同一個 setting 時會自動以 encrypted format 寫回。刪除 / 更新 setting 會寫 audit log，但 audit metadata 只記錄 key 名，唔會記錄 secret value。
+
 ## 3. 我哋唔加密邊啲欄位（同原因）
 
 - `name_zh` / `name_en` / `phone` / `email` — 因為 `/api/search` 同 `/api/ai` 嘅 client 名 lookup 都靠 `ILIKE`。如果加密咗就無法搜尋。
