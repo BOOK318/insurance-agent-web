@@ -57,8 +57,7 @@ function AIChat() {
   }]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  // Store full client object — tokenization happens server-side in /api/ai
-  const [clientContext, setClientContext] = useState<Record<string, unknown> | null>(null);
+  const [activeClientId, setActiveClientId] = useState(clientId);
   const [clientDisplayName, setClientDisplayName] = useState(clientNameParam);
   const [recording, setRecording] = useState(false);
   const [voicePreview, setVoicePreview] = useState('');
@@ -95,13 +94,13 @@ function AIChat() {
       .catch(() => {});
   }, []);
 
-  // Load full client row — PII tokenization happens server-side in /api/ai
+  // Load display data only; /api/ai resolves the owned client row server-side.
   useEffect(() => {
     if (!clientId) return;
+    setActiveClientId(clientId);
     fetch(`/api/clients/${clientId}`)
       .then(r => r.json())
       .then((c: Record<string, unknown>) => {
-        setClientContext(c);   // full object, tokenized by server before Claude
         const displayName = (c.name_zh ?? c.name_en) as string;
         setClientDisplayName(displayName);
         setMessages(m => [...m, {
@@ -288,7 +287,7 @@ function AIChat() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           messages: newMessages,
-          clientContext: clientContext ?? undefined,
+          clientId: activeClientId ?? undefined,
         }),
       });
       const data = await res.json() as {
@@ -308,7 +307,7 @@ function AIChat() {
         }
         // If a new client was just saved, refresh local context with it
         if (data.action === 'saved_client' && data.client) {
-          setClientContext(data.client);
+          if (typeof data.client.id === 'string') setActiveClientId(data.client.id);
           setClientDisplayName(((data.client.name_zh ?? data.client.name_en) as string) ?? null);
         }
         setMessages(m => [...m, {

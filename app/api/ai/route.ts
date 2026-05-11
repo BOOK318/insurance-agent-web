@@ -13,9 +13,9 @@
  *   ├─ "query_client"  → DB lookup → tokenize PII → Claude → detokenize
  *   └─ "general"       → tokenize (if context loaded) → Claude → detokenize
  *
- * Body: { messages, clientContext? }
+ * Body: { messages, clientId? }
  *   messages: [{role, content, imageBase64?, mediaType?}]
- *   clientContext: optional raw DB row (PII tokenized server-side before Claude)
+ *   clientId: optional owned client id. The server loads and tokenizes the row.
  *
  * Returns: { reply, action?, client?, processedNote? }
  */
@@ -136,13 +136,15 @@ async function detectIntent(text: string, agentId: string): Promise<IntentResult
   for (const c of clients) {
     if (c.name_zh && text.includes(c.name_zh)) {
       const { rows: full } = await db.query<Record<string, unknown>>(
-        'SELECT * FROM clients WHERE id = $1 AND deleted_at IS NULL', [c.id]
+        'SELECT * FROM clients WHERE id = $1 AND agent_id = $2 AND deleted_at IS NULL',
+        [c.id, agentId]
       );
       if (full[0]) return { intent: 'query_client', matched_client: { id: c.id, name: c.name_zh, row: full[0] } };
     }
     if (c.name_en && lowerText.includes(c.name_en.toLowerCase())) {
       const { rows: full } = await db.query<Record<string, unknown>>(
-        'SELECT * FROM clients WHERE id = $1 AND deleted_at IS NULL', [c.id]
+        'SELECT * FROM clients WHERE id = $1 AND agent_id = $2 AND deleted_at IS NULL',
+        [c.id, agentId]
       );
       if (full[0]) return { intent: 'query_client', matched_client: { id: c.id, name: c.name_en, row: full[0] } };
     }
@@ -204,6 +206,14 @@ function prepareMessageForClaude(
   return result;
 }
 
+async function getOwnedClientContext(agentId: string, clientId: string) {
+  const { rows } = await db.query<Record<string, unknown>>(
+    'SELECT * FROM clients WHERE id = $1 AND agent_id = $2 AND deleted_at IS NULL',
+    [clientId, agentId]
+  );
+  return rows[0] ?? null;
+}
+
 // ─────────────────────────────────────────────────────────────
 // Route handler
 // ─────────────────────────────────────────────────────────────
@@ -233,8 +243,9 @@ export async function POST(req: NextRequest) {
   const user = await getSession();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { messages, clientContext: providedContext } = await req.json() as {
+  const { messages, clientId, clientContext: legacyClientContext } = await req.json() as {
     messages: IncomingMessage[];
+    clientId?: string;
     clientContext?: Record<string, unknown> | string;
   };
 
@@ -350,8 +361,19 @@ export async function POST(req: NextRequest) {
   }
 
   // ── STEP 3b: QUERY_CLIENT — already-resolved DB row from intent ──
-  let clientContext = providedContext;
+  const requestedClientId =
+    typeof clientId === 'string'
+      ? clientId.trim()
+      : legacyClientContext && typeof legacyClientContext === 'object' && typeof legacyClientContext.id === 'string'
+        ? legacyClientContext.id.trim()
+        : '';
+  let clientContext = requestedClientId
+    ? await getOwnedClientContext(user.id, requestedClientId)
+    : null;
   let resolvedClientName: string | null = null;
+  if (requestedClientId && !clientContext) {
+    return NextResponse.json({ error: '找不到客戶' }, { status: 404 });
+  }
   if (!clientContext && intent.intent === 'query_client' && intent.matched_client) {
     clientContext = intent.matched_client.row;
     resolvedClientName = intent.matched_client.name;
@@ -366,8 +388,6 @@ export async function POST(req: NextRequest) {
       const { context, tokenMap: tm } = buildAnonymizedContext(clientContext);
       systemPrompt += `\n\n當前客戶資料（已匿名）：\n${context}`;
       tokenMap = tm;
-    } else {
-      systemPrompt += `\n\n當前客戶資料：\n${clientContext}`;
     }
   }
 
