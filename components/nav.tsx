@@ -34,7 +34,7 @@ export function SideNav() {
   return (
     <aside className="hidden md:flex flex-col w-56 bg-blue-900 text-white min-h-screen p-4">
       <div className="text-xl font-bold mb-8 flex items-center gap-2">
-        🛡️ InsuranceAI
+        🛡️ Dennis
       </div>
       <nav className="flex flex-col gap-1">
         {links.map(({ href, label, icon: Icon }) => (

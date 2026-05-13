@@ -82,8 +82,8 @@ export default async function AgentDashboard() {
           <Link href="/ai" className="text-center bg-gray-100 text-gray-800 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-200 transition">
             💬 問AI助手
           </Link>
-          <Link href="/search" className="text-center bg-gray-100 text-gray-800 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-200 transition flex items-center justify-center gap-1.5">
-            <Search size={14} /> 搜尋
+          <Link href="/search" className="col-span-2 text-center bg-slate-900 text-white py-3.5 rounded-xl text-sm font-semibold hover:bg-slate-800 transition flex items-center justify-center gap-2 shadow-sm">
+            <Search size={17} /> 快速搜尋
           </Link>
         </div>
       </div>

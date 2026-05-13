@@ -8,7 +8,7 @@ export async function POST() {
   const user = await getSession();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const sent = await sendPushToUser(user.id, {
-    title: 'InsuranceAI 測試通知',
+    title: 'Dennis 測試通知',
     body: '如果你睇到呢個訊息，push 已經正常運作。',
     url: '/reminders',
     tag: 'test',
