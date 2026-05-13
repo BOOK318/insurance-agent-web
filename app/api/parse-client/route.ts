@@ -12,7 +12,16 @@
  *   OLLAMA_VISION_MODEL default: llava             (images)
  */
 import { NextRequest, NextResponse } from 'next/server';
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { getSession } from '../../../lib/auth';
+import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist/legacy/build/pdf.mjs';
+
+export const runtime = 'nodejs';
+
+GlobalWorkerOptions.workerSrc = pathToFileURL(
+  join(process.cwd(), 'node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs')
+).href;
 
 const OLLAMA_URL   = process.env.OLLAMA_URL           ?? 'http://localhost:11434';
 // EXTRACT_MODEL is purpose-built for structured extraction (e.g. NuExtract).
@@ -65,6 +74,26 @@ interface OllamaResponse {
   message?: { content: string };
   response?: string;          // /api/generate fallback
   error?: string;
+}
+
+function normalizeExtractedText(text: string) {
+  return text.replace(/\u0000/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+async function extractPdfText(file: Blob) {
+  const data = new Uint8Array(await file.arrayBuffer());
+  const doc = await getDocument({ data }).promise;
+  const pages: string[] = [];
+
+  for (let i = 1; i <= doc.numPages; i += 1) {
+    const page = await doc.getPage(i);
+    const content = await page.getTextContent();
+    const pageText = content.items.map((item) => ('str' in item ? item.str : '')).join(' ');
+    const normalized = normalizeExtractedText(pageText);
+    if (normalized) pages.push(`[P${i}] ${normalized}`);
+  }
+
+  return normalizeExtractedText(pages.join('\n'));
 }
 
 async function callOllama(
@@ -123,6 +152,42 @@ function parseJSON(raw: string): Record<string, unknown> {
 export async function POST(req: NextRequest) {
   const user = await getSession();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  const contentType = req.headers.get('content-type') ?? '';
+  if (contentType.includes('multipart/form-data')) {
+    const form = await req.formData();
+    const file = form.get('file');
+    if (!(file instanceof Blob) || file.size === 0) {
+      return NextResponse.json({ error: 'No PDF provided' }, { status: 400 });
+    }
+
+    const type = (file.type || '').split(';')[0];
+    if (type !== 'application/pdf') {
+      return NextResponse.json({ error: '只支援 PDF 文件' }, { status: 400 });
+    }
+
+    try {
+      const text = await extractPdfText(file);
+      if (!text) {
+        return NextResponse.json({ error: 'PDF 沒有可讀文字，請改用拍照掃描' }, { status: 422 });
+      }
+
+      const prompt = `PDF文件內容：\n${text.slice(0, 20000)}\n\n請從這份PDF提取客戶資料，以指定 JSON 格式回覆。`;
+      const rawResponse = await callOllama(TEXT_MODEL, prompt);
+      const data = parseJSON(rawResponse);
+      return NextResponse.json(data);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes('fetch failed') || msg.includes('ECONNREFUSED')) {
+        return NextResponse.json(
+          { error: 'Ollama 未啟動。請在 Mac mini 執行：ollama serve', ollamaDown: true },
+          { status: 503 }
+        );
+      }
+      console.error('[parse-client-pdf]', msg);
+      return NextResponse.json({ error: msg }, { status: 500 });
+    }
+  }
 
   const body = await req.json() as {
     text?: string;

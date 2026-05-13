@@ -1,9 +1,8 @@
 'use client';
-import { useEffect, useState, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Mic, MicOff, Camera, Loader2, Save, X } from 'lucide-react';
+import { ArrowLeft, Camera, FileText, Loader2, Save, X } from 'lucide-react';
 import Link from 'next/link';
-import { startWavRecording, type WavRecorder } from '../../../../lib/wav-recorder';
 
 interface ClientFields {
   name_zh: string;
@@ -36,56 +35,16 @@ const EMPTY: ClientFields = {
   family_notes: '', assets_notes: '', property_notes: '', preferences: '', notes: '',
 };
 
-// Web Speech API type declarations
-declare global {
-  interface Window {
-    SpeechRecognition: new () => SpeechRecognition;
-    webkitSpeechRecognition: new () => SpeechRecognition;
-  }
-}
-
-interface SpeechRecognition extends EventTarget {
-  lang: string;
-  continuous: boolean;
-  interimResults: boolean;
-  start(): void;
-  stop(): void;
-  onresult: ((event: SpeechRecognitionEvent) => void) | null;
-  onerror: ((event: Event) => void) | null;
-  onend: (() => void) | null;
-}
-
-interface SpeechRecognitionEvent extends Event {
-  results: SpeechRecognitionResultList;
-}
-
-interface SpeechRecognitionResultList {
-  length: number;
-  [index: number]: SpeechRecognitionResult;
-}
-
-interface SpeechRecognitionResult {
-  [index: number]: SpeechRecognitionAlternative;
-  isFinal: boolean;
-}
-
-interface SpeechRecognitionAlternative {
-  transcript: string;
-}
-
 export default function NewClientPage() {
   const router = useRouter();
   const [fields, setFields] = useState<ClientFields>(EMPTY);
-  const [recording, setRecording] = useState(false);
   const [parsing, setParsing] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [voiceText, setVoiceText] = useState('');
   const [error, setError] = useState('');
   const [toast, setToast] = useState('');
   const [quickSaveReady, setQuickSaveReady] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
-  const recorderRef = useRef<WavRecorder | null>(null);
+  const cameraFileRef = useRef<HTMLInputElement>(null);
+  const pdfFileRef = useRef<HTMLInputElement>(null);
 
   function set(k: keyof ClientFields, v: string) {
     setFields(f => ({ ...f, [k]: v }));
@@ -96,99 +55,8 @@ export default function NewClientPage() {
     setTimeout(() => setToast(''), 3000);
   }
 
-  useEffect(() => () => {
-    recorderRef.current?.cancel();
-    recorderRef.current = null;
-    const recognition = recognitionRef.current;
-    if (recognition) {
-      recognition.onresult = null;
-      recognition.onerror = null;
-      recognition.onend = null;
-      recognition.stop();
-      recognitionRef.current = null;
-    }
-  }, []);
-
-  // ── Voice Input ──────────────────────────────────────────
-  async function toggleRecording() {
-    if (recording) {
-      const recorder = recorderRef.current;
-      if (recorder) {
-        recorderRef.current = null;
-        setRecording(false);
-        await transcribeStoppedRecording(recorder.stop());
-        return;
-      }
-      recognitionRef.current?.stop();
-      setRecording(false);
-      return;
-    }
-
-    if (navigator.mediaDevices?.getUserMedia) {
-      try {
-        const recorder = await startWavRecording();
-        recorderRef.current = recorder;
-        setRecording(true);
-        setVoiceText('本地錄音中…');
-        setError('');
-        return;
-      } catch {
-        // If the browser blocks local recording, use Web Speech as a fallback.
-      }
-    }
-
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) {
-      setError('你的瀏覽器不支援語音輸入，請使用 Chrome 或開啟本地 Whisper');
-      return;
-    }
-
-    const rec = new SR();
-    rec.lang = 'zh-HK';
-    rec.continuous = true;
-    rec.interimResults = false;
-    recognitionRef.current = rec;
-
-    let transcript = '';
-    rec.onresult = (e: SpeechRecognitionEvent) => {
-      for (let i = 0; i < e.results.length; i++) {
-        transcript += e.results[i][0].transcript + ' ';
-      }
-      setVoiceText(transcript.trim());
-    };
-    rec.onerror = () => { setRecording(false); };
-    rec.onend = () => {
-      setRecording(false);
-      if (transcript.trim()) parseText(transcript.trim());
-    };
-
-    rec.start();
-    setRecording(true);
-    setVoiceText('');
-    setError('');
-  }
-
-  async function transcribeStoppedRecording(audioPromise: Promise<Blob>) {
-    setParsing(true);
-    setVoiceText('本地 Whisper 轉錄中…');
-    try {
-      const audio = await audioPromise;
-      if (audio.size <= 44) {
-        setVoiceText('');
-        return;
-      }
-      const transcript = await transcribeAudio(audio);
-      setVoiceText(transcript);
-      if (transcript.trim()) await parseText(transcript.trim());
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '本地 Whisper 轉錄失敗');
-    } finally {
-      setParsing(false);
-    }
-  }
-
   // ── Document Scan ────────────────────────────────────────
-  async function handleDocUpload(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
     setParsing(true);
@@ -202,18 +70,22 @@ export default function NewClientPage() {
       setError('文件讀取失敗，請重試');
     } finally {
       setParsing(false);
-      if (fileRef.current) fileRef.current.value = '';
+      if (cameraFileRef.current) cameraFileRef.current.value = '';
     }
   }
 
-  async function parseText(text: string) {
+  async function handlePdfUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
     setParsing(true);
     setError('');
+
     try {
+      const form = new FormData();
+      form.append('file', file, file.name);
       const res = await fetch('/api/parse-client', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
+        body: form,
       });
       const data = await res.json() as Partial<ClientFields> & { error?: string; ollamaDown?: boolean };
       if (data.ollamaDown) {
@@ -228,6 +100,7 @@ export default function NewClientPage() {
       setError('AI 解析失敗，請手動填寫');
     } finally {
       setParsing(false);
+      if (pdfFileRef.current) pdfFileRef.current.value = '';
     }
   }
 
@@ -360,51 +233,44 @@ export default function NewClientPage() {
       {/* AI Input Tools */}
       <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 rounded-2xl p-4 mb-5">
         <p className="text-sm font-semibold text-blue-900 mb-1">✨ AI 快速輸入</p>
-        <p className="text-xs text-blue-700 mb-3">語音講出客戶資料，或上傳文件，AI 自動填表</p>
+        <p className="text-xs text-blue-700 mb-3">影相掃描或上載 PDF，AI 自動填表</p>
 
         <div className="flex gap-2">
-          {/* Voice */}
           <button
-            onClick={toggleRecording}
+            onClick={() => cameraFileRef.current?.click()}
             disabled={parsing}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-medium text-sm transition ${
-              recording
-                ? 'bg-rose-500 text-white animate-pulse'
-                : 'bg-white border border-blue-200 text-blue-700 hover:bg-blue-50'
-            }`}
-          >
-            {recording ? <MicOff size={16} /> : <Mic size={16} />}
-            {recording ? '停止錄音' : '語音輸入'}
-          </button>
-
-          {/* Doc scan */}
-          <button
-            onClick={() => fileRef.current?.click()}
-            disabled={parsing || recording}
             className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-medium text-sm bg-white border border-blue-200 text-blue-700 hover:bg-blue-50 transition disabled:opacity-50"
           >
             {parsing ? <Loader2 size={16} className="animate-spin" /> : <Camera size={16} />}
-            {parsing ? '分析中…' : '掃描文件'}
+            {parsing ? '分析中…' : '影相掃描'}
+          </button>
+
+          <button
+            onClick={() => pdfFileRef.current?.click()}
+            disabled={parsing}
+            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-medium text-sm bg-white border border-blue-200 text-blue-700 hover:bg-blue-50 transition disabled:opacity-50"
+          >
+            {parsing ? <Loader2 size={16} className="animate-spin" /> : <FileText size={16} />}
+            {parsing ? '分析中…' : '上載 PDF'}
           </button>
         </div>
 
         {/* Hidden file input */}
         <input
-          ref={fileRef}
+          ref={cameraFileRef}
           type="file"
           accept="image/*"
           capture="environment"
           className="hidden"
-          onChange={handleDocUpload}
+          onChange={handleImageUpload}
         />
-
-        {/* Voice transcript preview */}
-        {(recording || voiceText) && (
-          <div className="mt-3 bg-white rounded-xl px-3 py-2.5 text-sm text-gray-700 border border-blue-100 min-h-[40px]">
-            {recording && <span className="text-red-500 text-xs">🔴 錄音中…</span>}
-            {voiceText && <p className="mt-1">{voiceText}</p>}
-          </div>
-        )}
+        <input
+          ref={pdfFileRef}
+          type="file"
+          accept="application/pdf,.pdf"
+          className="hidden"
+          onChange={handlePdfUpload}
+        />
       </div>
 
       {/* Form */}
@@ -530,16 +396,4 @@ function fileToBase64(file: File): Promise<string> {
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
-}
-
-async function transcribeAudio(audio: Blob) {
-  const form = new FormData();
-  form.append('audio', audio, 'recording.wav');
-  const res = await fetch('/api/transcribe', {
-    method: 'POST',
-    body: form,
-  });
-  const data = await res.json().catch(() => ({})) as { text?: string; error?: string };
-  if (!res.ok) throw new Error(data.error ?? '本地 Whisper 轉錄失敗');
-  return (data.text ?? '').trim();
 }
