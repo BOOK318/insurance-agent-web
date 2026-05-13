@@ -22,6 +22,8 @@ export async function GET(_req: NextRequest) {
   const user = await getSession();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+  // Inbox-style: return every reminder for this agent. Read/unread is
+  // expressed by is_sent; the page surfaces it as a blue dot.
   const { rows } = await db.query(
     `SELECT r.*, c.name_zh, c.name_en
      FROM reminders r
@@ -29,8 +31,8 @@ export async function GET(_req: NextRequest) {
        ON c.id = r.client_id
       AND c.agent_id = r.agent_id
       AND c.deleted_at IS NULL
-     WHERE r.agent_id = $1 AND r.is_sent = FALSE
-     ORDER BY r.remind_at ASC`,
+     WHERE r.agent_id = $1
+     ORDER BY COALESCE(r.pushed_at, r.remind_at) DESC`,
     [user.id]
   );
   return NextResponse.json(rows);

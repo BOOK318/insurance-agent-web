@@ -6,10 +6,10 @@
 - Security: admin user delete records the cascade impact (clients/policies/claims/documents counts) in the audit log so the destruction is recoverable forensically.
 - Security: admin user delete now also purges the agent's document directory on disk so orphan PDFs/images don't linger after a hard delete.
 - Security: hardened the on-disk purge with a strict UUID guard (8-4-4-4-12 hex) plus a path-under-`ROOT` check — caught and fixed during testing where the original looser regex accepted any 32-character hex-ish string.
-- Fix: reminders worker now writes `is_sent = TRUE` alongside `pushed_at` after a successful push, so already-delivered reminders actually leave the agent's inbox instead of piling up forever.
-- Fix: worker startup runs a one-shot backfill of `is_sent` on any rows where `pushed_at IS NOT NULL AND is_sent = FALSE`, so production self-heals on the first tick after deploy.
-- Fix: removed the dead "標記全部已讀" button on the reminders page (it had no onClick handler).
-- Tests: added `tests/purge-agent-dir.test.mjs`, `tests/admin-delete-user.test.mjs`, and `tests/worker-reminders.test.mjs` covering the on-disk purge contract, the nine control-flow branches of the admin delete handler, and the five worker reminder contract cases.
+- Feature: reminders page is now an email-style inbox — every reminder is listed (read and unread), unread rows show a blue dot, "全部標記為已讀" sweeps all unread to read, and clicking a single reminder Gmail-style marks it read while navigating.
+- Feature: new `POST /api/reminders/mark-all-read` and `PATCH /api/reminders/[id]` endpoints back the inbox actions; both are scoped to the calling agent so cross-tenant marks are no-ops.
+- Behaviour: reminders worker now only writes `pushed_at` after a push (reverted from earlier same-day intent to also write `is_sent`). Read/unread is owned by the user; the worker tracks delivery only.
+- Tests: added `tests/purge-agent-dir.test.mjs`, `tests/admin-delete-user.test.mjs`, `tests/worker-reminders.test.mjs`, and `tests/reminders-inbox.test.mjs` covering the on-disk purge contract, the nine control-flow branches of the admin delete handler, the worker's three contract cases (including a guard that throws if the worker ever writes is_sent again), and the ten endpoint cases for the inbox model.
 
 ## 2026-05-12
 
