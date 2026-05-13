@@ -2,8 +2,7 @@ import React from 'react';
 import { getSession } from '../../lib/auth';
 import { db } from '../../lib/db';
 import Link from 'next/link';
-import { Users, FileText, AlertCircle, Bell, Settings } from 'lucide-react';
-import { DashboardSearch } from './dashboard-search';
+import { Users, FileText, AlertCircle, Bell, Search, Settings } from 'lucide-react';
 
 export default async function AgentDashboard() {
   const user = await getSession();
@@ -50,8 +49,6 @@ export default async function AgentDashboard() {
         </Link>
       </div>
 
-      <DashboardSearch />
-
       <div className="grid grid-cols-2 gap-3 mb-5">
         {stats.map(s => (
           <Link key={s.label} href={s.href}
@@ -78,21 +75,17 @@ export default async function AgentDashboard() {
 
       <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
         <p className="font-semibold mb-3">快捷操作</p>
-        <div className="grid grid-cols-2 gap-2 mb-2">
+        <div className="grid grid-cols-2 gap-2">
           <Link href="/clients/new" className="text-center bg-blue-700 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-blue-800 transition">
             ＋ 新增客戶
           </Link>
           <Link href="/ai" className="text-center bg-gray-100 text-gray-800 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-200 transition">
             💬 問AI助手
           </Link>
+          <Link href="/search" className="text-center bg-gray-100 text-gray-800 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-200 transition flex items-center justify-center gap-1.5">
+            <Search size={14} /> 搜尋
+          </Link>
         </div>
-        {/* Quick voice/scan record — full width shortcut */}
-        <Link
-          href="/clients/new"
-          className="flex items-center justify-center gap-2 w-full bg-gradient-to-r from-indigo-50 to-blue-50 border border-blue-100 text-blue-800 py-2.5 rounded-lg text-sm font-medium hover:from-blue-100 hover:to-indigo-100 transition"
-        >
-          🎙️ 語音 / 掃描文件 → 自動儲存客戶
-        </Link>
       </div>
     </div>
   );

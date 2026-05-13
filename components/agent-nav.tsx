@@ -15,12 +15,16 @@ const links = [
   { href: '/ai', label: 'AI助手', icon: MessageSquare },
 ];
 
-const mobileLinks = links.filter(link => link.href !== '/search');
-
 export function AgentNav({ user }: { user: User }) {
   const path = usePathname();
   const router = useRouter();
   const hideMobileNav = path.startsWith('/ai');
+  const mobileLinks = [
+    ...links.filter(link => link.href !== '/search'),
+    ...(user.role === 'head' || user.role === 'admin'
+      ? [{ href: '/head', label: 'Team', icon: Users }]
+      : []),
+  ];
 
   async function logout() {
     await fetch('/api/auth/logout', { method: 'POST' });

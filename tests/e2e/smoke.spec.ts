@@ -90,15 +90,12 @@ test('clients list renders for agent', async ({ page }) => {
   await expect(page.locator('h1', { hasText: '我的客戶' })).toBeVisible({ timeout: 10000 });
 });
 
-test('agent can search from the dashboard shortcut', async ({ page }) => {
+test('agent can open search from the dashboard shortcut', async ({ page }) => {
   await login(page, AGENT);
   await page.waitForURL(/\/(?:$|\?)/, { timeout: 10000 });
-  await page.getByLabel('主頁快速搜尋').fill('陳家');
-  await page.getByRole('button', { name: '搜尋' }).click();
-  await expect(page).toHaveURL(/\/search\?q=/);
+  await page.getByRole('main').getByRole('link', { name: /搜尋/ }).click();
+  await expect(page).toHaveURL(/\/search$/);
   await expect(page.getByRole('heading', { name: '搜尋' })).toBeVisible();
-  await expect(page.getByLabel('搜尋關鍵字')).toHaveValue('陳家');
-  await expect(page.getByText('陳家俊')).toBeVisible();
 });
 
 test('search page has a back button to the dashboard', async ({ page }) => {
@@ -117,6 +114,17 @@ test('mobile bottom navigation does not include search', async ({ page }) => {
   const mobileNav = page.getByRole('navigation', { name: '手機主導航' });
   await expect(mobileNav).toBeVisible();
   await expect(mobileNav.getByRole('link', { name: /搜尋/ })).toHaveCount(0);
+});
+
+test('admin mobile bottom navigation includes team overview from dashboard', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await login(page, ADMIN);
+  await page.waitForURL('**/head', { timeout: 10000 });
+  await page.goto('/');
+
+  const mobileNav = page.getByRole('navigation', { name: '手機主導航' });
+  await expect(mobileNav).toBeVisible();
+  await expect(mobileNav.getByRole('link', { name: 'Team' })).toBeVisible();
 });
 
 test('global search returns the seeded client', async ({ page, request }) => {
