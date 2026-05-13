@@ -1,9 +1,8 @@
 'use client';
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Camera, FileText, Loader2, Save, X } from 'lucide-react';
+import { ArrowLeft, Loader2, Save, X } from 'lucide-react';
 import Link from 'next/link';
-import { buildPolicyPayloadForClient, hasUsablePolicyDraft } from '../../../../lib/policy-draft.mjs';
 
 interface ClientFields {
   name_zh: string;
@@ -28,29 +27,6 @@ interface ClientFields {
   notes: string;
 }
 
-interface PolicyDraft {
-  policy_number?: string | number | null;
-  company?: string | null;
-  type?: string | null;
-  product_name?: string | null;
-  currency?: string | null;
-  premium?: string | number | null;
-  premium_frequency?: string | null;
-  sum_assured?: string | number | null;
-  death_benefit?: string | number | null;
-  policyholder_name?: string | null;
-  insured_name?: string | null;
-  start_date?: string | null;
-  expiry_date?: string | null;
-  notes?: string | null;
-}
-
-interface ParseClientResponse extends Partial<ClientFields> {
-  error?: string;
-  ollamaDown?: boolean;
-  policy?: PolicyDraft | null;
-}
-
 const EMPTY: ClientFields = {
   name_zh: '', name_en: '', phone: '', email: '',
   occupation: '', annual_income: '', dob: '', gender: '', nationality: '',
@@ -62,113 +38,11 @@ const EMPTY: ClientFields = {
 export default function NewClientPage() {
   const router = useRouter();
   const [fields, setFields] = useState<ClientFields>(EMPTY);
-  const [parsing, setParsing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [toast, setToast] = useState('');
-  const [quickSaveReady, setQuickSaveReady] = useState(false);
-  const [pendingPolicy, setPendingPolicy] = useState<PolicyDraft | null>(null);
-  const cameraFileRef = useRef<HTMLInputElement>(null);
-  const pdfFileRef = useRef<HTMLInputElement>(null);
 
   function set(k: keyof ClientFields, v: string) {
     setFields(f => ({ ...f, [k]: v }));
-  }
-
-  function showToast(msg: string) {
-    setToast(msg);
-    setTimeout(() => setToast(''), 3000);
-  }
-
-  // ── Document Scan ────────────────────────────────────────
-  async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setParsing(true);
-    setError('');
-
-    try {
-      const base64 = await fileToBase64(file);
-      const mediaType = file.type as 'image/jpeg' | 'image/png' | 'image/webp';
-      await parseImage(base64, mediaType);
-    } catch {
-      setError('文件讀取失敗，請重試');
-    } finally {
-      setParsing(false);
-      if (cameraFileRef.current) cameraFileRef.current.value = '';
-    }
-  }
-
-  async function handlePdfUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setParsing(true);
-    setError('');
-
-    try {
-      const form = new FormData();
-      form.append('file', file, file.name);
-      const res = await fetch('/api/parse-client', {
-        method: 'POST',
-        body: form,
-      });
-      const data = await res.json() as ParseClientResponse;
-      if (data.ollamaDown) {
-        setError('⚠️ Ollama 未啟動 — 請在 Mac mini 執行：ollama serve');
-      } else if (data.error) {
-        setError(`解析失敗：${data.error}`);
-      } else {
-        applyParsed(data);
-        showToast('✅ AI 已自動填入資料');
-      }
-    } catch {
-      setError('AI 解析失敗，請手動填寫');
-    } finally {
-      setParsing(false);
-      if (pdfFileRef.current) pdfFileRef.current.value = '';
-    }
-  }
-
-  async function parseImage(base64: string, mediaType: string) {
-    const res = await fetch('/api/parse-client', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ imageBase64: base64, mediaType }),
-    });
-    const data = await res.json() as ParseClientResponse;
-    applyParsed(data);
-    showToast('✅ 文件掃描完成');
-  }
-
-  function applyParsed(data: ParseClientResponse) {
-    setFields(prev => ({
-      ...prev,
-      name_zh: data.name_zh ?? prev.name_zh,
-      name_en: data.name_en ?? prev.name_en,
-      phone: data.phone ?? prev.phone,
-      email: data.email ?? prev.email,
-      occupation: data.occupation ?? prev.occupation,
-      annual_income: data.annual_income ? String(data.annual_income) : prev.annual_income,
-      monthly_expenses: data.monthly_expenses ? String(data.monthly_expenses) : prev.monthly_expenses,
-      mortgage_balance: data.mortgage_balance ? String(data.mortgage_balance) : prev.mortgage_balance,
-      liabilities_notes: data.liabilities_notes ?? prev.liabilities_notes,
-      dependents_count: data.dependents_count ? String(data.dependents_count) : prev.dependents_count,
-      existing_coverage_notes: data.existing_coverage_notes ?? prev.existing_coverage_notes,
-      financial_goals: data.financial_goals ?? prev.financial_goals,
-      dob: data.dob ?? prev.dob,
-      gender: data.gender ?? prev.gender,
-      nationality: data.nationality ?? prev.nationality,
-      family_notes: data.family_notes ?? prev.family_notes,
-      assets_notes: data.assets_notes ?? prev.assets_notes,
-      property_notes: data.property_notes ?? prev.property_notes,
-      preferences: data.preferences ?? prev.preferences,
-      notes: data.notes ?? prev.notes,
-    }));
-    // Show quick-save option if name was extracted
-    if (data.name_zh || data.name_en) setQuickSaveReady(true);
-    if (data.policy && hasUsablePolicyDraft(data.policy)) {
-      setPendingPolicy(data.policy);
-    }
   }
 
   // ── Save ─────────────────────────────────────────────────
@@ -194,14 +68,6 @@ export default function NewClientPage() {
       });
       if (!res.ok) throw new Error();
       const client = await res.json() as { id: string };
-      if (pendingPolicy && hasUsablePolicyDraft(pendingPolicy)) {
-        const clientName = fields.name_zh || fields.name_en;
-        await createPolicyForClient(client.id, {
-          ...pendingPolicy,
-          policyholder_name: pendingPolicy.policyholder_name || clientName,
-          insured_name: pendingPolicy.insured_name || clientName,
-        });
-      }
       router.push(`/clients/${client.id}`);
     } catch {
       setError('儲存失敗，請重試');
@@ -220,13 +86,6 @@ export default function NewClientPage() {
         <h1 className="text-xl font-bold">新增客戶</h1>
       </div>
 
-      {/* Toast */}
-      {toast && (
-        <div className="mb-4 bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm rounded-2xl px-4 py-3">
-          {toast}
-        </div>
-      )}
-
       {/* Error */}
       {error && (
         <div className="mb-4 bg-rose-50 border border-rose-200 text-rose-700 text-sm rounded-2xl px-4 py-3 flex items-center justify-between">
@@ -234,105 +93,6 @@ export default function NewClientPage() {
           <button onClick={() => setError('')}><X size={14} /></button>
         </div>
       )}
-
-      {/* Quick Save Banner */}
-      {quickSaveReady && (
-        <div className="mb-4 bg-emerald-50 border border-emerald-200 rounded-2xl px-4 py-3 flex items-center justify-between gap-3">
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-emerald-900">✅ AI 已提取資料</p>
-            <p className="text-xs text-emerald-700 mt-0.5">
-              {fields.name_zh || fields.name_en}
-              {fields.phone ? ` · ${fields.phone}` : ''}
-            </p>
-          </div>
-          <div className="flex gap-2 shrink-0">
-            <button
-              onClick={() => setQuickSaveReady(false)}
-              className="text-xs text-emerald-700 px-3 py-1.5 rounded-xl hover:bg-emerald-100 transition"
-            >
-              核對表格
-            </button>
-            <button
-              onClick={async () => {
-                setQuickSaveReady(false);
-                await save();
-              }}
-              disabled={saving}
-              className="text-xs bg-emerald-600 text-white px-3 py-1.5 rounded-xl hover:bg-emerald-700 transition disabled:opacity-60 font-semibold"
-            >
-              {saving ? '儲存中…' : '直接儲存 →'}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {pendingPolicy && (
-        <div className="mb-4 bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-amber-950">將會同步新增保單</p>
-            <p className="text-xs text-amber-800 mt-1">
-              {[pendingPolicy.company, pendingPolicy.product_name, pendingPolicy.policy_number ? `#${pendingPolicy.policy_number}` : '']
-                .filter(Boolean)
-                .join(' · ') || '已從 PDF 抽到保單資料'}
-            </p>
-            {(pendingPolicy.insured_name || pendingPolicy.policyholder_name) && (
-              <p className="text-xs text-amber-700 mt-1">
-                受保人：{pendingPolicy.insured_name || pendingPolicy.policyholder_name}
-              </p>
-            )}
-          </div>
-          <button
-            type="button"
-            onClick={() => setPendingPolicy(null)}
-            className="shrink-0 text-xs text-amber-800 px-3 py-1.5 rounded-xl hover:bg-amber-100 transition"
-          >
-            不建立
-          </button>
-        </div>
-      )}
-
-      {/* AI Input Tools */}
-      <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 rounded-2xl p-4 mb-5">
-        <p className="text-sm font-semibold text-blue-900 mb-1">✨ AI 快速輸入</p>
-        <p className="text-xs text-blue-700 mb-3">影相掃描或上載 PDF，AI 自動填表</p>
-
-        <div className="flex gap-2">
-          <button
-            onClick={() => cameraFileRef.current?.click()}
-            disabled={parsing}
-            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-medium text-sm bg-white border border-blue-200 text-blue-700 hover:bg-blue-50 transition disabled:opacity-50"
-          >
-            {parsing ? <Loader2 size={16} className="animate-spin" /> : <Camera size={16} />}
-            {parsing ? '分析中…' : '影相掃描'}
-          </button>
-
-          <button
-            onClick={() => pdfFileRef.current?.click()}
-            disabled={parsing}
-            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-medium text-sm bg-white border border-blue-200 text-blue-700 hover:bg-blue-50 transition disabled:opacity-50"
-          >
-            {parsing ? <Loader2 size={16} className="animate-spin" /> : <FileText size={16} />}
-            {parsing ? '分析中…' : '上載 PDF'}
-          </button>
-        </div>
-
-        {/* Hidden file input */}
-        <input
-          ref={cameraFileRef}
-          type="file"
-          accept="image/*"
-          capture="environment"
-          className="hidden"
-          onChange={handleImageUpload}
-        />
-        <input
-          ref={pdfFileRef}
-          type="file"
-          accept="application/pdf,.pdf"
-          className="hidden"
-          onChange={handlePdfUpload}
-        />
-      </div>
 
       {/* Form */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 space-y-4">
@@ -445,32 +205,4 @@ function TextArea({
       />
     </div>
   );
-}
-
-function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result as string;
-      resolve(result.split(',')[1]);
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
-
-async function createPolicyForClient(clientId: string, policy: PolicyDraft) {
-  const payload = buildPolicyPayloadForClient(clientId, policy);
-  if (!payload) return;
-
-  const res = await fetch('/api/policies', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({})) as { error?: string };
-    throw new Error(data.error || '同步新增保單失敗');
-  }
 }
