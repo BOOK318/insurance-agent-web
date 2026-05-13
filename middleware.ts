@@ -3,6 +3,17 @@ import { verifyToken } from './lib/jwt';
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
+  const host = req.headers.get('host') ?? '';
+  const forwardedProto = req.headers.get('x-forwarded-proto');
+  const isLocalHost = /^(localhost|127\.0\.0\.1|\[::1\])(?::\d+)?$/.test(host);
+
+  if (!isLocalHost && forwardedProto === 'http') {
+    const publicHost = host.replace(/:\d+$/, '');
+    return NextResponse.redirect(
+      `https://${publicHost}${req.nextUrl.pathname}${req.nextUrl.search}`,
+      308
+    );
+  }
 
   // 公開路由
   if (pathname.startsWith('/login') || pathname.startsWith('/api/auth')) {
