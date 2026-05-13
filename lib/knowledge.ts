@@ -11,6 +11,8 @@ type KnowledgeRow = {
 
 function scoreKnowledge(row: KnowledgeRow, query: string) {
   const q = query.toLowerCase();
+  const product = (row.product_name ?? '').toLowerCase();
+  const title = row.title.toLowerCase();
   const haystack = [
     row.company,
     row.category,
@@ -36,6 +38,21 @@ function scoreKnowledge(row: KnowledgeRow, query: string) {
     if (row.title.toLowerCase().includes(term)) score += 3;
     else if (haystack.includes(term)) score += 2;
   }
+  for (const term of ['break even', 'breakeven', '回本', '收支平衡', '供款', '保費', '現金價值', '身故', 'death benefit', 'cash value']) {
+    if (q.includes(term.toLowerCase()) && haystack.includes(term.toLowerCase())) score += 4;
+  }
+
+  const tokens = q
+    .split(/[^\p{L}\p{N}]+/u)
+    .map(term => term.trim())
+    .filter(term => term.length >= 2 && !['boc', 'life', 'plan', 'the', 'and'].includes(term));
+
+  for (const token of tokens) {
+    if (product.includes(token)) score += 12;
+    if (title.includes(token)) score += 8;
+    if (haystack.includes(token)) score += 3;
+  }
+
   return score;
 }
 
