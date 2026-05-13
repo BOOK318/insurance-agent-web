@@ -112,6 +112,7 @@ DB_PORT=$DB_PORT
 
 OLLAMA_URL=http://host.docker.internal:11434
 OLLAMA_MODEL=qwen2.5:7b
+OLLAMA_EXTRACT_MODEL=qwen2.5:0.5b
 OLLAMA_VISION_MODEL=qwen2.5vl:7b
 
 WHISPER_URL=http://host.docker.internal:9000/inference

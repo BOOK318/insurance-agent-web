@@ -213,6 +213,7 @@ DB_PORT=5432
 
 OLLAMA_URL=http://host.docker.internal:11434
 OLLAMA_MODEL=qwen2.5:7b
+OLLAMA_EXTRACT_MODEL=qwen2.5:0.5b
 OLLAMA_VISION_MODEL=qwen2.5vl:7b
 
 WHISPER_URL=http://host.docker.internal:9000/inference
@@ -257,6 +258,7 @@ ollama serve
 If Ollama is already running, continue. Pull models:
 
 ```bash
+ollama pull qwen2.5:0.5b
 ollama pull qwen2.5:7b
 ollama pull qwen2.5vl:7b
 curl http://localhost:11434/api/tags

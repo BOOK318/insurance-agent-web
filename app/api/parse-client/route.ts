@@ -76,8 +76,92 @@ interface OllamaResponse {
   error?: string;
 }
 
+type ExtractedClientFields = Record<string, string | number | null>;
+
 function normalizeExtractedText(text: string) {
   return text.replace(/\u0000/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function normalizeAmount(value: string) {
+  const clean = value.replace(/[, HKD$]/gi, '').trim();
+  const n = Number(clean);
+  return Number.isFinite(n) ? n : null;
+}
+
+function normalizeDate(value: string) {
+  const m = value.match(/(\d{4})[-/.年](\d{1,2})[-/.月](\d{1,2})/);
+  if (!m) return null;
+  return `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
+}
+
+const CLIENT_FIELD_LABELS = [
+  'Chinese name', 'Client name', 'Full name', 'Name', '姓名', '客戶姓名', '中文姓名', '英文姓名',
+  'Phone', 'Mobile', 'Tel', '電話', '手提電話',
+  'Email', '電郵', '電子郵件',
+  'Occupation', 'Job title', 'Profession', '職業', '職位',
+  'Annual income', 'Income', '年薪', '每年收入', '收入',
+  'DOB', 'Date of birth', 'Birth date', '出生日期',
+  'Gender', 'Sex', '性別',
+  'Nationality', '國籍',
+  'Family status', 'Marital status', 'Family', '家庭狀況', '婚姻狀況',
+];
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function matchLabel(text: string, labels: string[]) {
+  const labelPattern = labels.map(escapeRegExp).join('|');
+  const nextLabelPattern = CLIENT_FIELD_LABELS
+    .sort((a, b) => b.length - a.length)
+    .map(escapeRegExp)
+    .join('|');
+  const re = new RegExp(`(?:${labelPattern})\\s*[:：]?\\s*(.*?)(?=\\s+(?:${nextLabelPattern})\\s*[:：]?|$)`, 'i');
+  return text.match(re)?.[1]?.trim() ?? null;
+}
+
+function fastExtractClientFields(text: string) {
+  const fields: ExtractedClientFields = {};
+  const normalized = normalizeExtractedText(text);
+
+  const email = normalized.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0] ?? null;
+  if (email) fields.email = email;
+
+  const phone = normalized.match(/(?:\+?852[\s-]?)?([569]\d{3}[\s-]?\d{4})/)?.[1] ?? null;
+  if (phone) fields.phone = `+852 ${phone.replace(/\D/g, '')}`;
+
+  const name = matchLabel(normalized, ['Chinese name', 'Client name', 'Full name', 'Name', '姓名', '客戶姓名', '中文姓名', '英文姓名']);
+  if (name) {
+    fields[/[\u4e00-\u9fff]/.test(name) ? 'name_zh' : 'name_en'] = name;
+  }
+
+  const occupation = matchLabel(normalized, ['Occupation', 'Job title', 'Profession', '職業', '職位']);
+  if (occupation) fields.occupation = occupation;
+
+  const income = matchLabel(normalized, ['Annual income', 'Income', '年薪', '每年收入', '收入']);
+  const annualIncome = income ? normalizeAmount(income) : null;
+  if (annualIncome !== null) fields.annual_income = annualIncome;
+
+  const dob = matchLabel(normalized, ['DOB', 'Date of birth', 'Birth date', '出生日期']);
+  const normalizedDob = dob ? normalizeDate(dob) : null;
+  if (normalizedDob) fields.dob = normalizedDob;
+
+  const gender = matchLabel(normalized, ['Gender', 'Sex', '性別']);
+  if (gender) {
+    if (/^(m|male|男)/i.test(gender)) fields.gender = 'M';
+    if (/^(f|female|女)/i.test(gender)) fields.gender = 'F';
+  }
+
+  const nationality = matchLabel(normalized, ['Nationality', '國籍']);
+  if (nationality) fields.nationality = nationality;
+
+  const family = matchLabel(normalized, ['Family', 'Family status', 'Marital status', '家庭狀況', '婚姻狀況']);
+  if (family) fields.family_notes = family;
+
+  return {
+    fields,
+    count: Object.values(fields).filter(v => v !== null && v !== '').length,
+  };
 }
 
 async function extractPdfText(file: Blob) {
@@ -121,7 +205,12 @@ async function callOllama(
       ],
       stream: false,
       format: 'json',                  // force valid JSON output
-      options: { temperature: 0.1 },
+      keep_alive: '30m',
+      options: {
+        temperature: 0,
+        num_ctx: 2048,
+        num_predict: 384,
+      },
     }),
   });
 
@@ -172,7 +261,12 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'PDF 沒有可讀文字，請改用拍照掃描' }, { status: 422 });
       }
 
-      const prompt = `PDF文件內容：\n${text.slice(0, 20000)}\n\n請從這份PDF提取客戶資料，以指定 JSON 格式回覆。`;
+      const fast = fastExtractClientFields(text);
+      if (fast.count >= 2) {
+        return NextResponse.json(fast.fields);
+      }
+
+      const prompt = `PDF文件內容：\n${text.slice(0, 8000)}\n\n請從這份PDF提取客戶資料，以指定 JSON 格式回覆。`;
       const rawResponse = await callOllama(TEXT_MODEL, prompt);
       const data = parseJSON(rawResponse);
       return NextResponse.json(data);
