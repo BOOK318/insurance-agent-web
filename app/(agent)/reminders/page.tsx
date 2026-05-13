@@ -48,9 +48,8 @@ export default async function RemindersPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
+      <div className="mb-4">
         <h1 className="text-xl font-bold">提醒</h1>
-        <button className="text-xs text-blue-700 font-medium">標記全部已讀</button>
       </div>
 
       {/* Birthdays */}

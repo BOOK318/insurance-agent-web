@@ -94,7 +94,10 @@ async function processDueReminders() {
       url: r.client_id ? `/clients/${r.client_id}` : '/reminders',
       tag: 'reminder-' + r.id,
     });
-    await pool.query('UPDATE reminders SET pushed_at = NOW() WHERE id = $1', [r.id]);
+    await pool.query(
+      'UPDATE reminders SET pushed_at = NOW(), is_sent = TRUE WHERE id = $1',
+      [r.id],
+    );
     if (rows.length > 0) console.log(`[worker] pushed reminder ${r.id} to agent ${r.agent_id}`);
   }
 }
@@ -138,6 +141,22 @@ async function scheduleExpiringPolicies() {
   }
 }
 
+/**
+ * Historical drift: this worker used to write only pushed_at, but every UI
+ * query filters on is_sent. Reconcile any already-pushed rows so they leave
+ * the agent's inbox on the first tick after deploy.
+ */
+async function backfillPushedReminders() {
+  const { rowCount } = await pool.query(
+    `UPDATE reminders
+     SET is_sent = TRUE
+     WHERE pushed_at IS NOT NULL AND is_sent = FALSE`,
+  );
+  if (rowCount && rowCount > 0) {
+    console.log(`[worker] backfilled is_sent on ${rowCount} previously-pushed reminders`);
+  }
+}
+
 async function tick() {
   try {
     await scheduleExpiringPolicies();
@@ -148,5 +167,6 @@ async function tick() {
 }
 
 console.log(`[worker] starting — polling every ${POLL_MS / 1000}s`);
+await backfillPushedReminders().catch(err => console.error('[worker] backfill error', err));
 await tick();
 setInterval(tick, POLL_MS);

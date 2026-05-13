@@ -6,7 +6,10 @@
 - Security: admin user delete records the cascade impact (clients/policies/claims/documents counts) in the audit log so the destruction is recoverable forensically.
 - Security: admin user delete now also purges the agent's document directory on disk so orphan PDFs/images don't linger after a hard delete.
 - Security: hardened the on-disk purge with a strict UUID guard (8-4-4-4-12 hex) plus a path-under-`ROOT` check — caught and fixed during testing where the original looser regex accepted any 32-character hex-ish string.
-- Tests: added `tests/purge-agent-dir.test.mjs` and `tests/admin-delete-user.test.mjs` covering the on-disk purge contract and the nine control-flow branches of the admin delete handler.
+- Fix: reminders worker now writes `is_sent = TRUE` alongside `pushed_at` after a successful push, so already-delivered reminders actually leave the agent's inbox instead of piling up forever.
+- Fix: worker startup runs a one-shot backfill of `is_sent` on any rows where `pushed_at IS NOT NULL AND is_sent = FALSE`, so production self-heals on the first tick after deploy.
+- Fix: removed the dead "標記全部已讀" button on the reminders page (it had no onClick handler).
+- Tests: added `tests/purge-agent-dir.test.mjs`, `tests/admin-delete-user.test.mjs`, and `tests/worker-reminders.test.mjs` covering the on-disk purge contract, the nine control-flow branches of the admin delete handler, and the five worker reminder contract cases.
 
 ## 2026-05-12
 
