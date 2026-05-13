@@ -5,6 +5,7 @@ import { db } from '../../../../lib/db';
 import type { Role } from '../../../../lib/db';
 import { getClientIp, getMaxActiveUsers, isStrongPassword } from '../../../../lib/security';
 import { writeAuditLog } from '../../../../lib/audit';
+import { purgeAgentDir } from '../../../../lib/document-storage';
 
 const ROLES = new Set<Role>(['agent', 'head', 'admin']);
 
@@ -188,28 +189,64 @@ export async function DELETE(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const id = text(req.nextUrl.searchParams.get('id'));
-  if (!id) {
-    return NextResponse.json({ error: '缺少帳號 ID' }, { status: 400 });
-  }
+  if (!id) return NextResponse.json({ error: '缺少帳號 ID' }, { status: 400 });
   if (id === user.id) {
     return NextResponse.json({ error: '唔可以刪除自己嘅管理員帳號' }, { status: 400 });
   }
 
-  const { rows } = await db.query<{ id: string; email: string; role: Role }>(
-    'DELETE FROM users WHERE id = $1 RETURNING id, email, role',
+  const body = await req.json().catch(() => ({})) as { confirm_email?: unknown };
+  const confirmEmail = text(body.confirm_email).toLowerCase();
+  if (!confirmEmail) {
+    return NextResponse.json(
+      { error: '請輸入該帳號嘅 Email 確認刪除（會連同所有客戶、保單、Claim、文件一齊刪除）' },
+      { status: 400 }
+    );
+  }
+
+  const { rows: targets } = await db.query<{ id: string; email: string; role: Role }>(
+    'SELECT id, email, role FROM users WHERE id = $1',
     [id]
   );
-
-  if (!rows[0]) {
-    return NextResponse.json({ error: '找不到帳號' }, { status: 404 });
+  const target = targets[0];
+  if (!target) return NextResponse.json({ error: '找不到帳號' }, { status: 404 });
+  if (target.email.toLowerCase() !== confirmEmail) {
+    return NextResponse.json(
+      { error: '確認 Email 唔啱，請輸入嗰個帳號嘅 Email' },
+      { status: 400 }
+    );
   }
+
+  // Snapshot cascade impact for the audit log before the rows disappear.
+  const { rows: countsRows } = await db.query<{
+    clients: string; policies: string; claims: string; documents: string;
+  }>(
+    `SELECT
+       (SELECT COUNT(*) FROM clients   WHERE agent_id = $1) AS clients,
+       (SELECT COUNT(*) FROM policies  WHERE agent_id = $1) AS policies,
+       (SELECT COUNT(*) FROM claims    WHERE agent_id = $1) AS claims,
+       (SELECT COUNT(*) FROM documents WHERE agent_id = $1) AS documents`,
+    [id]
+  );
+  const counts = countsRows[0];
+
+  await db.query('DELETE FROM users WHERE id = $1', [id]);
+  await purgeAgentDir(id).catch(() => {});
 
   await writeAuditLog({
     actorUserId: user.id,
     action: 'admin.user.deleted',
     targetType: 'user',
-    targetId: rows[0].id,
-    metadata: { email: rows[0].email, role: rows[0].role },
+    targetId: target.id,
+    metadata: {
+      email: target.email,
+      role: target.role,
+      cascaded: {
+        clients:   Number(counts?.clients   ?? 0),
+        policies:  Number(counts?.policies  ?? 0),
+        claims:    Number(counts?.claims    ?? 0),
+        documents: Number(counts?.documents ?? 0),
+      },
+    },
     ip: getClientIp(req),
     userAgent: req.headers.get('user-agent'),
   });
