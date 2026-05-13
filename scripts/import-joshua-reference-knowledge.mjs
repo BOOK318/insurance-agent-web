@@ -5,8 +5,16 @@ import dotenv from 'dotenv';
 import pg from 'pg';
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 
+const EXPLICIT_DATABASE_URL = process.env.DATABASE_URL;
+
 dotenv.config({ path: '.env.local' });
 dotenv.config();
+
+if (!EXPLICIT_DATABASE_URL && process.env.DB_PASSWORD && !process.env.FORCE_DATABASE_URL) {
+  process.env.DATABASE_URL =
+    process.env.DATABASE_URL_OVERRIDE ||
+    `postgres://admin:${process.env.DB_PASSWORD}@127.0.0.1:${process.env.DB_PORT || '5432'}/insurance`;
+}
 
 const { Pool } = pg;
 
@@ -227,6 +235,101 @@ async function importPdfFile(client, filePath) {
   return { filePath, rows: chunks.length + 1, skipped: false };
 }
 
+function formatBucket(bucket) {
+  if (!bucket) return null;
+  const mode = bucket.bucket || bucket.comparisonBucket || '';
+  const status = bucket.status || '';
+  const actual = bucket.actualPremium != null ? `actual ${bucket.actualPremium}` : null;
+  const target = bucket.targetPremium != null ? `target ${bucket.targetPremium}` : null;
+  return [mode, status, actual, target].filter(Boolean).join(' / ');
+}
+
+async function importBocComparisonSummary(client) {
+  const bocDir = path.join(INPUT_ROOT, 'data', 'boc');
+  const categoryMapPath = path.join(bocDir, 'boc-product-category-map-2026-05-12.json');
+  const bucketMatrixPath = path.join(bocDir, 'boc-standard-bucket-matrix-2026-05-12.json');
+  const captureLogPath = path.join(bocDir, 'boc-standard-capture-log-2026-05-12.json');
+  if (!fs.existsSync(categoryMapPath) || !fs.existsSync(bucketMatrixPath) || !fs.existsSync(captureLogPath)) {
+    return { filePath: 'BOC comparison summary', rows: 0, skipped: true };
+  }
+
+  const categoryMap = JSON.parse(fs.readFileSync(categoryMapPath, 'utf8'));
+  const bucketMatrix = JSON.parse(fs.readFileSync(bucketMatrixPath, 'utf8'));
+  const captureLog = JSON.parse(fs.readFileSync(captureLogPath, 'utf8'));
+
+  const savingsGroup = (categoryMap.groups || []).find((group) =>
+    String(group.category || '').includes('儲蓄') ||
+    String(group.normalizedCategory || '').includes('savings')
+  );
+  const savingsProductsByCode = new Map((savingsGroup?.products || []).map((product) => [product.code, product]));
+  for (const capture of captureLog.captures || []) {
+    if (!capture.productCode || !capture.productNameZh) continue;
+    if (
+      String(capture.categoryNormalized || '').includes('savings') ||
+      String(capture.categoryPortal || '').includes('儲蓄') ||
+      String(capture.categoryPortal || '').includes('終身')
+    ) {
+      savingsProductsByCode.set(capture.productCode, {
+        code: capture.productCode,
+        name: capture.productNameZh,
+      });
+    }
+  }
+  const savingsProducts = [...savingsProductsByCode.values()].sort((a, b) =>
+    String(a.code).localeCompare(String(b.code))
+  );
+  const matrixByCode = new Map((bucketMatrix.products || []).map((product) => [product.productCode, product]));
+  const captureByCode = new Map();
+  for (const capture of captureLog.captures || []) {
+    if (!capture.productCode) continue;
+    const list = captureByCode.get(capture.productCode) || [];
+    list.push(capture);
+    captureByCode.set(capture.productCode, list);
+  }
+
+  const lines = [];
+  lines.push('BOC比較摘要：當 agent 問「BOC 有邊幾份 saving / 儲蓄可以做比較」時，優先用以下清單回答。');
+  lines.push('候選儲蓄/類儲蓄比較產品（來自 Joshua BOC category map）：');
+  for (const product of savingsProducts) {
+    const matrix = matrixByCode.get(product.code);
+    const generatedFromMatrix = (matrix?.buckets || []).filter((bucket) => bucket.status === 'PROPOSAL_GENERATED');
+    const generatedFromCaptures = (captureByCode.get(product.code) || []).filter((capture) =>
+      capture.status === 'PROPOSAL_GENERATED'
+    );
+    const generated = generatedFromMatrix.length ? generatedFromMatrix : generatedFromCaptures;
+    const liveTerms = matrix?.liveOptionsSummary?.payTerms?.join('/') || '';
+    const livePayModes = matrix?.liveOptionsSummary?.payModes?.join('/') || '';
+    const generatedText = generated.length ? generated.map(formatBucket).join('； ') : '未有已生成 proposal 數字，只可作產品候選/portal option 參考';
+    lines.push(`- ${product.code} ${product.name}：live pay terms ${liveTerms || '未記錄'}；pay modes ${livePayModes || '未記錄'}；已生成比較數據：${generatedText}`);
+  }
+  lines.push('已有詳細 proposal / illustration 數字可比較的重點產品：IBW65 薪火傳承環球終身壽險計劃、IBW66 鑄富世代環球終身壽險計劃、IBW69 薪粹傳承環球終身保險計劃。');
+  lines.push('IBW65 有 2Y/5Y/10Y 的 monthly/annual proposal generated；single buckets 按目前規則標記為 NOT_EXPLICIT_SINGLE_PER_USER_RULE。');
+  lines.push('IBW66 有 5Y monthly/annual proposal generated。');
+  lines.push('IBW69 有 2Y monthly/annual proposal generated。');
+  lines.push('IBE66 守躍保險計劃、IBN12 目標三年保險計劃出現在 savings candidate / live options，但目前未有完整 generated proposal 數字。');
+  lines.push('標準比較基準：USD monthly 1300、annual 15600、single 15600；以已入庫 proposal JSON 的 break-even、cash value、death benefit 作詳細比較。');
+
+  for (const [code, captures] of captureByCode.entries()) {
+    const useful = captures.filter((capture) =>
+      capture.status === 'PROPOSAL_GENERATED' ||
+      String(capture.categoryNormalized || '').includes('savings')
+    );
+    if (!useful.length) continue;
+    lines.push(`${code} captured buckets：${useful.map((capture) => formatBucket(capture)).filter(Boolean).join('； ')}`);
+  }
+
+  await upsertKnowledge(client, {
+    company: 'BOC Life Joshua Reference',
+    category: 'product',
+    productName: 'BOC儲蓄比較',
+    title: 'BOC比較摘要｜儲蓄 / savings 可以做比較的產品',
+    content: lines.join('\n'),
+    sourceUrl: `local:${categoryMapPath}`,
+  });
+
+  return { filePath: 'BOC comparison summary', rows: 1, skipped: false };
+}
+
 async function main() {
   if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is missing');
   if (!fs.existsSync(INPUT_ROOT)) throw new Error(`Input folder not found: ${INPUT_ROOT}`);
@@ -258,6 +361,9 @@ async function main() {
       results.push(result);
       totalRows += result.rows;
     }
+    const summaryResult = await importBocComparisonSummary(client);
+    results.push(summaryResult);
+    totalRows += summaryResult.rows;
     await client.query('COMMIT');
   } catch (error) {
     await client.query('ROLLBACK');

@@ -28,6 +28,12 @@ function scoreKnowledge(row: KnowledgeRow, query: string) {
   for (const term of ['claim', '索償', '理賠', '賠償', '醫療', '危疾', 'vhis', '自願醫保', '核保', '聯絡', 'hotline']) {
     if (q.includes(term) && haystack.includes(term)) score += 3;
   }
+  for (const term of ['saving', 'savings', 'save', '儲蓄', '儲蓄壽險', '比較', 'compare', 'comparison', '做到比較', '做比較']) {
+    if (q.includes(term.toLowerCase()) && haystack.includes(term.toLowerCase())) score += 8;
+  }
+  for (const term of ['BOC比較摘要', 'BOC儲蓄比較', '可比較', 'PROPOSAL_GENERATED', 'proposal generated']) {
+    if (haystack.includes(term.toLowerCase())) score += 6;
+  }
   for (const term of ['推廣活動', '產品資訊', '常用表格', '培訓資訊', '業務公告', '代理招聘', '銷售品質', '強積金', '業務伙伴', '業務夥伴', '一脈互動', '其他資訊']) {
     if (!q.includes(term)) continue;
     if (row.title.toLowerCase().includes(term)) score += 8;
@@ -67,11 +73,21 @@ export async function getRelevantKnowledgeContext(query: string) {
 
     if (rows.length === 0) return null;
 
-    const ranked = rows
+    const q = query.toLowerCase();
+    const isBocQuery = ['boc', '中銀', '中银', '中銀人壽', 'boc life'].some(term => q.includes(term));
+    const scopedRows = isBocQuery
+      ? rows.filter(row => {
+          const company = row.company.toLowerCase();
+          const source = (row.source_url ?? '').toLowerCase();
+          return company.includes('boc') || company.includes('中銀') || source.includes('/boc/') || source.includes('boc-');
+        })
+      : rows;
+
+    const ranked = scopedRows
       .map(row => ({ row, score: scoreKnowledge(row, query) }))
-      .filter(item => item.score > 0 || rows.length <= 10)
+      .filter(item => item.score > 0 || scopedRows.length <= 10)
       .sort((a, b) => b.score - a.score)
-      .slice(0, 8)
+      .slice(0, 14)
       .map(({ row }) => {
         const product = row.product_name ? ` / ${row.product_name}` : '';
         const source = row.source_url ? ` 來源：${row.source_url}` : '';
