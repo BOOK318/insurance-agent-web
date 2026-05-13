@@ -84,6 +84,18 @@ function AIChat() {
   const autoSalesAdviceRef = useRef(false);
 
   useEffect(() => {
+    const previousHtmlOverflow = document.documentElement.style.overflow;
+    const previousBodyOverflow = document.body.style.overflow;
+    document.documentElement.style.overflow = 'hidden';
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.documentElement.style.overflow = previousHtmlOverflow;
+      document.body.style.overflow = previousBodyOverflow;
+    };
+  }, []);
+
+  useEffect(() => {
     if (clientId && mode === 'sales-advice') return;
     fetch('/api/ai')
       .then(r => r.ok ? r.json() : null)
@@ -333,7 +345,8 @@ function AIChat() {
 
   return (
     <div
-      className="relative flex flex-col h-[calc(100dvh-1.75rem)] md:h-[calc(100vh-3rem)] -m-3.5 md:-m-6"
+      data-testid="ai-shell"
+      className="fixed inset-0 z-40 flex flex-col bg-white md:relative md:inset-auto md:z-auto md:h-[calc(100vh-3rem)] md:-m-6"
       onDragOver={e => {
         e.preventDefault();
         setDraggingFile(true);
@@ -352,7 +365,7 @@ function AIChat() {
         </div>
       )}
       {/* Header */}
-      <div className="bg-white border-b border-gray-100 px-4 py-3 flex items-center gap-3 shrink-0">
+      <div className="bg-white border-b border-gray-100 px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))] md:pt-3 flex items-center gap-3 shrink-0">
         <button onClick={() => router.back()}
           className="w-9 h-9 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-500 transition">
           <ArrowLeft size={20} />
@@ -373,7 +386,11 @@ function AIChat() {
       </div>
 
       {/* Messages */}
-      <div ref={scrollerRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-3 bg-gray-50">
+      <div
+        ref={scrollerRef}
+        data-testid="ai-message-scroller"
+        className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 py-4 space-y-3 bg-gray-50"
+      >
         {messages.map((m, i) => (
           <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             {m.role === 'user' && m.imageBase64 ? (
@@ -485,7 +502,7 @@ function AIChat() {
       )}
 
       {/* Input row */}
-      <div className="px-3 pb-3 pt-1.5 bg-white border-t border-gray-100 shrink-0">
+      <div className="px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] md:pb-3 pt-1.5 bg-white border-t border-gray-100 shrink-0">
         <div className="flex items-end gap-2">
           {/* Voice button */}
           <button

@@ -27,8 +27,10 @@ export default async function HeadLayout({ children }: { children: React.ReactNo
         <nav className="flex flex-col gap-1">
           <Link href="/head" className="text-sm text-gray-200 hover:bg-gray-800 px-3 py-2.5 rounded-lg">📊 業績總覽</Link>
           <Link href="/head/agents" className="text-sm text-gray-200 hover:bg-gray-800 px-3 py-2.5 rounded-lg">👥 Agent列表</Link>
+          <Link href="/admin/settings" className="text-sm text-amber-300 hover:bg-gray-800 px-3 py-2.5 rounded-lg mt-2">📣 通知公告</Link>
+          <Link href="/admin/knowledge" className="text-sm text-amber-300 hover:bg-gray-800 px-3 py-2.5 rounded-lg">🧠 AI 知識庫</Link>
           {isAdmin && (
-            <Link href="/admin/settings" className="text-sm text-amber-300 hover:bg-gray-800 px-3 py-2.5 rounded-lg mt-2">🔑 系統設定</Link>
+            <Link href="/admin/users" className="text-sm text-amber-300 hover:bg-gray-800 px-3 py-2.5 rounded-lg">👥 帳號管理</Link>
           )}
           <Link href="/" className="text-sm text-gray-400 hover:bg-gray-800 px-3 py-2.5 rounded-lg mt-4">← 返回我的頁面</Link>
         </nav>
@@ -41,14 +43,15 @@ export default async function HeadLayout({ children }: { children: React.ReactNo
                 {link.label}
               </Link>
             ))}
+            <Link href="/admin/settings" className="px-3 py-1.5 bg-amber-50 border border-amber-200 text-amber-800 rounded-full shadow-sm">
+              通知
+            </Link>
+            <Link href="/admin/knowledge" className="px-3 py-1.5 bg-amber-50 border border-amber-200 text-amber-800 rounded-full shadow-sm">
+              AI知識
+            </Link>
             {isAdmin && (
-              <Link href="/admin/settings" className="px-3 py-1.5 bg-amber-50 border border-amber-200 text-amber-800 rounded-full shadow-sm">
-                設定
-              </Link>
-            )}
-            {isAdmin && (
-              <Link href="/admin/knowledge" className="px-3 py-1.5 bg-amber-50 border border-amber-200 text-amber-800 rounded-full shadow-sm">
-                AI知識
+              <Link href="/admin/users" className="px-3 py-1.5 bg-amber-50 border border-amber-200 text-amber-800 rounded-full shadow-sm">
+                帳號
               </Link>
             )}
           </div>

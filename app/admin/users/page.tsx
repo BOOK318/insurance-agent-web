@@ -1,10 +1,15 @@
 import { db } from '../../../lib/db';
 import { UsersAdminPanel, type AdminUserRow } from './users-admin-panel';
 import { getMaxActiveUsers } from '../../../lib/security';
+import { getSession } from '../../../lib/auth';
+import { redirect } from 'next/navigation';
 
 export const dynamic = 'force-dynamic';
 
 export default async function AdminUsersPage() {
+  const user = await getSession();
+  if (!user || user.role !== 'admin') redirect('/head');
+
   const { rows: users } = await db.query<AdminUserRow>(
     `SELECT id, name, email, role, is_active, created_at
      FROM users

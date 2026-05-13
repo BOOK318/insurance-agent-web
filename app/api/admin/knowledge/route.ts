@@ -22,14 +22,14 @@ function text(value: unknown) {
   return typeof value === 'string' ? value.trim() : '';
 }
 
-async function requireAdmin() {
+async function requireKnowledgeManager() {
   const user = await getSession();
-  if (!user || user.role !== 'admin') return null;
+  if (!user || (user.role !== 'admin' && user.role !== 'head')) return null;
   return user;
 }
 
 export async function GET() {
-  const user = await requireAdmin();
+  const user = await requireKnowledgeManager();
   if (!user) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const { rows } = await db.query<KnowledgeRow>(
@@ -44,7 +44,7 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const user = await requireAdmin();
+  const user = await requireKnowledgeManager();
   if (!user) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const body = await req.json().catch(() => ({})) as Record<string, unknown>;
@@ -92,7 +92,7 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
-  const user = await requireAdmin();
+  const user = await requireKnowledgeManager();
   if (!user) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const body = await req.json().catch(() => ({})) as Record<string, unknown>;
@@ -125,7 +125,7 @@ export async function PATCH(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const user = await requireAdmin();
+  const user = await requireKnowledgeManager();
   if (!user) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const id = text(req.nextUrl.searchParams.get('id'));

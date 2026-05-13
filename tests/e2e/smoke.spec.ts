@@ -17,6 +17,7 @@ import { test, expect } from '@playwright/test';
 
 const AGENT = { email: 'agent@team.local', password: 'Agent@1234' };
 const ADMIN = { email: 'admin@team.local', password: 'Admin@1234' };
+const HEAD = { email: 'head@team.local', password: 'HeadAgent@1234' };
 
 test.beforeAll(async ({ request }) => {
   const adminLogin = await request.post('/api/auth/login', { data: ADMIN });
@@ -26,6 +27,7 @@ test.beforeAll(async ({ request }) => {
   expect(usersRes.ok()).toBeTruthy();
   const users = await usersRes.json() as Array<{ id: string; email: string; is_active: boolean }>;
   const existingAgent = users.find(user => user.email === AGENT.email);
+  const existingHead = users.find(user => user.email === HEAD.email);
 
   if (existingAgent) {
     const patch = await request.patch('/api/admin/users', {
@@ -39,6 +41,23 @@ test.beforeAll(async ({ request }) => {
         email: AGENT.email,
         role: 'agent',
         password: AGENT.password,
+      },
+    });
+    expect(create.ok()).toBeTruthy();
+  }
+
+  if (existingHead) {
+    const patch = await request.patch('/api/admin/users', {
+      data: { id: existingHead.id, password: HEAD.password, is_active: true },
+    });
+    expect(patch.ok()).toBeTruthy();
+  } else {
+    const create = await request.post('/api/admin/users', {
+      data: {
+        name: '測試 Head',
+        email: HEAD.email,
+        role: 'head',
+        password: HEAD.password,
       },
     });
     expect(create.ok()).toBeTruthy();
@@ -114,6 +133,30 @@ test('mobile bottom navigation does not include search', async ({ page }) => {
   const mobileNav = page.getByRole('navigation', { name: '手機主導航' });
   await expect(mobileNav).toBeVisible();
   await expect(mobileNav.getByRole('link', { name: /搜尋/ })).toHaveCount(0);
+});
+
+test('mobile AI chat locks page scrolling to the message area', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await login(page, AGENT);
+  await page.waitForURL(/\/(?:$|\?)/, { timeout: 10000 });
+  await page.goto('/ai');
+
+  await expect(page.getByTestId('ai-shell')).toBeVisible();
+  await expect(page.getByTestId('ai-message-scroller')).toBeVisible();
+  await expect(page.getByRole('navigation', { name: '手機主導航' })).toHaveCount(0);
+
+  const lockState = await page.evaluate(() => ({
+    htmlOverflow: document.documentElement.style.overflow,
+    bodyOverflow: document.body.style.overflow,
+    windowScrollY: window.scrollY,
+    shellPosition: getComputedStyle(document.querySelector('[data-testid="ai-shell"]') as HTMLElement).position,
+    scrollerOverflow: getComputedStyle(document.querySelector('[data-testid="ai-message-scroller"]') as HTMLElement).overflowY,
+  }));
+  expect(lockState.htmlOverflow).toBe('hidden');
+  expect(lockState.bodyOverflow).toBe('hidden');
+  expect(lockState.windowScrollY).toBe(0);
+  expect(lockState.shellPosition).toBe('fixed');
+  expect(lockState.scrollerOverflow).toBe('auto');
 });
 
 test('admin mobile bottom navigation includes team overview from dashboard', async ({ page }) => {
@@ -218,6 +261,44 @@ test('admin settings no longer exposes Anthropic API key editing', async ({ page
   await expect(page.getByRole('heading', { name: '系統設定' })).toBeVisible();
   await expect(page.getByText('Anthropic API Key')).toHaveCount(0);
   await expect(page.getByPlaceholder('sk-ant-…')).toHaveCount(0);
+});
+
+test('head can send broadcasts and manage AI knowledge but not user accounts', async ({ request, page }) => {
+  await request.post('/api/auth/login', { data: HEAD });
+
+  const forbiddenUsers = await request.get('/api/admin/users');
+  expect(forbiddenUsers.status()).toBe(403);
+
+  const broadcast = await request.post('/api/admin/broadcast', {
+    data: {
+      title: 'Head 測試通知',
+      body: 'Team Head 可以發送通知。',
+      role: 'head',
+      url: '/head',
+    },
+  });
+  expect(broadcast.ok()).toBeTruthy();
+
+  const title = `Head 測試知識 ${Date.now()}`;
+  const create = await request.post('/api/admin/knowledge', {
+    data: {
+      company: 'BOC Life',
+      title,
+      content: 'Team Head 可補充 AI 銷售知識，內容需保持合規並提醒以正式文件為準。',
+    },
+  });
+  expect(create.ok()).toBeTruthy();
+  const created = await create.json() as { id: string };
+
+  const del = await request.delete(`/api/admin/knowledge?id=${created.id}`);
+  expect(del.ok()).toBeTruthy();
+
+  await login(page, HEAD);
+  await page.waitForURL('**/head', { timeout: 10000 });
+  await page.goto('/admin/settings');
+  await expect(page.getByRole('heading', { name: '系統設定' })).toBeVisible();
+  await page.goto('/admin/knowledge');
+  await expect(page.getByRole('heading', { name: 'AI 知識庫' })).toBeVisible();
 });
 
 test('admin can delete a user and recreate the same email', async ({ request }) => {

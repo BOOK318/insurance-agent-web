@@ -8,7 +8,7 @@ const ROLES = new Set(['agent', 'head', 'admin', 'all']);
 
 export async function POST(req: NextRequest) {
   const user = await getSession();
-  if (!user || user.role !== 'admin') {
+  if (!user || (user.role !== 'admin' && user.role !== 'head')) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
