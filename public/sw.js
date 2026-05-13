@@ -1,4 +1,4 @@
-// Service worker for Dennis Web Push.
+// Service worker for Inexadesk.AI Web Push.
 // Kept minimal on purpose — no caching/offline logic yet (that's Phase 6).
 //
 // Lifecycle:
@@ -16,7 +16,7 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('push', (event) => {
-  let data = { title: 'Dennis', body: '', url: '/' };
+  let data = { title: 'Inexadesk.AI', body: '', url: '/' };
   try {
     if (event.data) data = { ...data, ...event.data.json() };
   } catch {

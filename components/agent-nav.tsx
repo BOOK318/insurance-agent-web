@@ -40,7 +40,7 @@ export function AgentNav({ user }: { user: User }) {
     <>
       {/* 電腦側邊欄 */}
       <aside className="hidden md:flex flex-col w-56 bg-blue-900 text-white min-h-screen p-4">
-        <div className="text-lg font-bold mb-1 flex items-center gap-2">🛡️ Dennis</div>
+        <div className="text-lg font-bold mb-1 flex items-center gap-2">🛡️ Inexadesk.AI</div>
         <p className="text-blue-300 text-xs mb-6">{user.name}</p>
         <nav className="flex flex-col gap-1 flex-1">
           {links.map(({ href, label, icon: Icon }) => (

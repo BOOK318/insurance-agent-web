@@ -37,7 +37,7 @@ export default function LoginPage() {
       <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-sm">
         <div className="text-center mb-8">
           <div className="text-4xl mb-2">🛡️</div>
-          <h1 className="text-2xl font-bold">Dennis</h1>
+          <h1 className="text-2xl font-bold">Inexadesk.AI</h1>
           <p className="text-gray-500 text-sm mt-1">保險Agent智能助手</p>
         </div>
         <form onSubmit={handleLogin} className="space-y-4">
