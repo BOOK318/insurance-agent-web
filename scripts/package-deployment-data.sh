@@ -33,6 +33,7 @@ cd "$ROOT_DIR"
   echo "- knowledge-base/raw-pdfs/boc-portal/"
   echo "- backups/db-*.sql.gz"
   echo "- backups/docs-*.tar.gz"
+  echo "- external-data/joshua-reference/ (optional source snapshot)"
   echo
   echo "Counts:"
   find knowledge-base -maxdepth 1 -type f -name 'boc-portal*.json' 2>/dev/null | wc -l | awk '{print "- BOC JSON files: " $1}'
@@ -48,6 +49,7 @@ cd "$ROOT_DIR"
   echo "Restore notes:"
   echo "- If db-*.sql.gz exists, restore that first on the new machine."
   echo "- If no DB backup exists, import knowledge-base files with the import scripts."
+  echo "- The Joshua reference source snapshot is optional; the DB backup already contains imported rows."
   echo "- Do not upload this package to public GitHub."
 } > "$MANIFEST"
 
@@ -67,11 +69,41 @@ if [[ -d backups ]]; then
   done < <(find backups -maxdepth 1 -type f \( -name 'db-*.sql.gz' -o -name 'docs-*.tar.gz' \) 2>/dev/null | sort)
 fi
 
+JOSHUA_ROOT="${JOSHUA_REFERENCE_ROOT:-/Users/book/Documents/insurance app Joshua/public-insurance-information-app}"
+JOSHUA_PDF_ROOT="${JOSHUA_REFERENCE_PDF_ROOT:-/Users/book/Documents/insurance app Joshua/fwd-standard-capture-2026-05-11/raw-pdfs}"
+JOSHUA_OUT="$TMP_DIR/external-data/joshua-reference"
+if [[ -d "$JOSHUA_ROOT/data/boc" || -d "$JOSHUA_PDF_ROOT" ]]; then
+  mkdir -p "$JOSHUA_OUT"
+  if [[ -d "$JOSHUA_ROOT/data/boc" ]]; then
+    mkdir -p "$JOSHUA_OUT/data"
+    cp -R "$JOSHUA_ROOT/data/boc" "$JOSHUA_OUT/data/boc"
+  fi
+  if [[ -d "$JOSHUA_ROOT/data/medical" ]]; then
+    mkdir -p "$JOSHUA_OUT/data/medical"
+    find "$JOSHUA_ROOT/data/medical" -maxdepth 1 -type f -iname '*boc*' -exec cp {} "$JOSHUA_OUT/data/medical/" \;
+  fi
+  if [[ -d "$JOSHUA_PDF_ROOT" ]]; then
+    mkdir -p "$JOSHUA_OUT/raw-pdfs"
+    find "$JOSHUA_PDF_ROOT" -maxdepth 1 -type f -iname '*.pdf' -exec cp {} "$JOSHUA_OUT/raw-pdfs/" \;
+  fi
+  paths+=("external-data/joshua-reference")
+fi
+
 if [[ "${#paths[@]}" -eq 0 ]]; then
   echo "No deployment data found to package." >&2
   exit 1
 fi
 
-tar -czf "$PACKAGE_PATH" -C "$TMP_DIR" DATA-MANIFEST.txt -C "$ROOT_DIR" "${paths[@]}"
+root_paths=()
+tmp_paths=("DATA-MANIFEST.txt")
+for item in "${paths[@]}"; do
+  if [[ "$item" == external-data/* ]]; then
+    tmp_paths+=("$item")
+  else
+    root_paths+=("$item")
+  fi
+done
+
+tar -czf "$PACKAGE_PATH" -C "$TMP_DIR" "${tmp_paths[@]}" -C "$ROOT_DIR" "${root_paths[@]}"
 
 echo "$PACKAGE_PATH"
