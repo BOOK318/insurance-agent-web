@@ -182,3 +182,37 @@ export async function PATCH(req: NextRequest) {
 
   return NextResponse.json(rows[0]);
 }
+
+export async function DELETE(req: NextRequest) {
+  const user = await requireAdmin();
+  if (!user) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+
+  const id = text(req.nextUrl.searchParams.get('id'));
+  if (!id) {
+    return NextResponse.json({ error: '缺少帳號 ID' }, { status: 400 });
+  }
+  if (id === user.id) {
+    return NextResponse.json({ error: '唔可以刪除自己嘅管理員帳號' }, { status: 400 });
+  }
+
+  const { rows } = await db.query<{ id: string; email: string; role: Role }>(
+    'DELETE FROM users WHERE id = $1 RETURNING id, email, role',
+    [id]
+  );
+
+  if (!rows[0]) {
+    return NextResponse.json({ error: '找不到帳號' }, { status: 404 });
+  }
+
+  await writeAuditLog({
+    actorUserId: user.id,
+    action: 'admin.user.deleted',
+    targetType: 'user',
+    targetId: rows[0].id,
+    metadata: { email: rows[0].email, role: rows[0].role },
+    ip: getClientIp(req),
+    userAgent: req.headers.get('user-agent'),
+  });
+
+  return NextResponse.json({ ok: true });
+}

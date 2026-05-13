@@ -2,6 +2,18 @@ import { getSession } from '../../lib/auth';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 
+const mobileLinks = [
+  { href: '/', label: '主頁' },
+  { href: '/clients', label: '客戶' },
+  { href: '/policies', label: '保單' },
+  { href: '/claims', label: 'Claim' },
+  { href: '/reminders', label: '提醒' },
+  { href: '/ai', label: 'AI' },
+  { href: '/head', label: '業績' },
+  { href: '/admin/users', label: '帳號' },
+  { href: '/admin/settings', label: '設定' },
+];
+
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const user = await getSession();
   if (!user) redirect('/login');
@@ -20,10 +32,14 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       </aside>
       <main className="flex-1 p-4 md:p-6 max-w-3xl w-full mx-auto">
         {/* Mobile top bar */}
-        <div className="md:hidden flex items-center gap-3 mb-4 text-sm">
-          <Link href="/admin/users" className="px-3 py-1.5 bg-white border border-gray-200 rounded-full">👥 帳號</Link>
-          <Link href="/admin/settings" className="px-3 py-1.5 bg-white border border-gray-200 rounded-full">🔑 設定</Link>
-          <Link href="/head" className="px-3 py-1.5 bg-white border border-gray-200 rounded-full">📊 Team</Link>
+        <div className="md:hidden -mx-4 px-4 pb-3 mb-4 overflow-x-auto">
+          <div className="flex items-center gap-2 min-w-max text-sm">
+            {mobileLinks.map(link => (
+              <Link key={link.href} href={link.href} className="px-3 py-1.5 bg-white border border-gray-200 rounded-full shadow-sm">
+                {link.label}
+              </Link>
+            ))}
+          </div>
         </div>
         {children}
       </main>

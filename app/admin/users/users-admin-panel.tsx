@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { Check, Loader2, Plus, RotateCcw, X, UserCheck, UserX } from 'lucide-react';
+import { Check, Loader2, Plus, RotateCcw, Trash2, X, UserCheck, UserX } from 'lucide-react';
 
 export type AdminUserRow = {
   id: string;
@@ -52,6 +52,7 @@ export function UsersAdminPanel({
   const [creating, setCreating] = useState(false);
   const [resetUserId, setResetUserId] = useState<string | null>(null);
   const [resetPasswordValue, setResetPasswordValue] = useState('');
+  const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
 
   function set<K extends keyof CreateFields>(key: K, value: CreateFields[K]) {
@@ -114,6 +115,26 @@ export function UsersAdminPanel({
     await updateUser(user.id, { password: resetPasswordValue }, '已重設密碼');
     setResetUserId(null);
     setResetPasswordValue('');
+  }
+
+  async function deleteUser(user: AdminUserRow) {
+    setBusyId(user.id);
+    setMsg(null);
+
+    const res = await fetch(`/api/admin/users?id=${encodeURIComponent(user.id)}`, {
+      method: 'DELETE',
+    });
+
+    setBusyId(null);
+    setDeleteUserId(null);
+    const data = await res.json().catch(() => ({})) as { error?: string };
+    if (!res.ok) {
+      setMsg({ type: 'err', text: data.error ?? '刪除帳號失敗' });
+      return;
+    }
+
+    setMsg({ type: 'ok', text: '已刪除帳號，可以用同一 Email 重新建立' });
+    router.refresh();
   }
 
   const activeCount = initialUsers.filter(user => user.is_active).length;
@@ -224,8 +245,42 @@ export function UsersAdminPanel({
                     <UserCheck size={15} />
                   </IconButton>
                 )}
+                <IconButton
+                  label="刪除"
+                  disabled={busyId === user.id}
+                  onClick={() => {
+                    setMsg(null);
+                    setDeleteUserId(user.id);
+                  }}
+                >
+                  <Trash2 size={15} />
+                </IconButton>
               </div>
             </div>
+            {deleteUserId === user.id && (
+              <div className="mt-3 border-t border-gray-100 pt-3 flex flex-col sm:flex-row sm:items-center gap-2 text-sm">
+                <p className="text-red-700 flex-1">
+                  確定永久刪除 {user.email}？相關客戶、保單、提醒、對話都會一併刪除。
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => deleteUser(user)}
+                    disabled={busyId === user.id}
+                    className="px-3 py-1.5 rounded-lg bg-red-600 text-white font-semibold hover:bg-red-700 disabled:opacity-60"
+                  >
+                    {busyId === user.id ? '刪除中…' : '永久刪除'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDeleteUserId(null)}
+                    className="px-3 py-1.5 rounded-lg bg-gray-50 text-gray-600 hover:bg-gray-100"
+                  >
+                    取消
+                  </button>
+                </div>
+              </div>
+            )}
             {resetUserId === user.id && (
               <form onSubmit={e => resetPassword(e, user)} className="mt-3 border-t border-gray-100 pt-3">
                 <label className="text-xs text-gray-400 block mb-1">新密碼</label>

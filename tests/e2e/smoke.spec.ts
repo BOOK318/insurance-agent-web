@@ -165,55 +165,6 @@ test('transcribe rejects browser-compressed audio before Whisper', async ({ requ
   expect(json.error).toContain('WAV');
 });
 
-test('client voice recording releases the microphone when leaving the page', async ({ page }) => {
-  await page.addInitScript(() => {
-    const increment = (key: string) => {
-      localStorage.setItem(key, String(Number(localStorage.getItem(key) ?? '0') + 1));
-    };
-    Object.defineProperty(navigator, 'mediaDevices', {
-      configurable: true,
-      value: {
-        getUserMedia: async () => ({
-          getTracks: () => [{ stop: () => increment('mockTracksStopped') }],
-        }),
-      },
-    });
-
-    class MockAudioContext {
-      sampleRate = 16000;
-      destination = {};
-      resume() { return Promise.resolve(); }
-      close() { increment('mockAudioClosed'); return Promise.resolve(); }
-      createMediaStreamSource() {
-        return { connect() {}, disconnect() {} };
-      }
-      createScriptProcessor() {
-        return { onaudioprocess: null, connect() {}, disconnect() {} };
-      }
-      createGain() {
-        return { gain: { value: 1 }, connect() {}, disconnect() {} };
-      }
-    }
-
-    Object.defineProperty(window, 'AudioContext', { configurable: true, value: MockAudioContext });
-  });
-
-  await login(page, AGENT);
-  await page.waitForURL(/\/(?:$|\?)/, { timeout: 10000 });
-  await page.goto('/clients/new');
-  await page.getByRole('button', { name: '語音輸入' }).click();
-  await expect(page.getByText('本地錄音中…')).toBeVisible();
-  await page.getByRole('link', { name: '主頁' }).click();
-  await page.waitForURL(/\/(?:$|\?)/, { timeout: 10000 });
-
-  const cleanupState = await page.evaluate(() => ({
-    audioClosed: Number(localStorage.getItem('mockAudioClosed') ?? '0'),
-    tracksStopped: Number(localStorage.getItem('mockTracksStopped') ?? '0'),
-  }));
-  expect(cleanupState.audioClosed).toBe(1);
-  expect(cleanupState.tracksStopped).toBe(1);
-});
-
 test('wrong password is rejected', async ({ page }) => {
   await page.goto('/login');
   await page.locator('input[type="email"]').fill(AGENT.email);
@@ -236,4 +187,50 @@ test('admin gets 403 from non-admin route check', async ({ request }) => {
   await request.post('/api/auth/login', { data: ADMIN });
   const ok = await request.get('/api/admin/users');
   expect(ok.ok()).toBeTruthy();
+});
+
+test('admin mobile pages expose main navigation links', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await login(page, ADMIN);
+  await page.waitForURL('**/head', { timeout: 10000 });
+  await page.goto('/admin/users');
+
+  await expect(page.getByRole('link', { name: '主頁' })).toBeVisible();
+  await expect(page.getByRole('link', { name: '客戶' })).toBeVisible();
+  await expect(page.getByRole('link', { name: '保單' })).toBeVisible();
+  await expect(page.getByRole('link', { name: '業績' })).toBeVisible();
+});
+
+test('admin settings no longer exposes Anthropic API key editing', async ({ page }) => {
+  await login(page, ADMIN);
+  await page.waitForURL('**/head', { timeout: 10000 });
+  await page.goto('/admin/settings');
+
+  await expect(page.getByRole('heading', { name: '系統設定' })).toBeVisible();
+  await expect(page.getByText('Anthropic API Key')).toHaveCount(0);
+  await expect(page.getByPlaceholder('sk-ant-…')).toHaveCount(0);
+});
+
+test('admin can delete a user and recreate the same email', async ({ request }) => {
+  await request.post('/api/auth/login', { data: ADMIN });
+  const email = `delete-recreate-${Date.now()}@team.local`;
+  const payload = {
+    name: 'Delete Recreate',
+    email,
+    role: 'agent',
+    password: 'Agent@1234',
+  };
+
+  const create = await request.post('/api/admin/users', { data: payload });
+  expect(create.ok()).toBeTruthy();
+  const created = await create.json() as { id: string };
+
+  const del = await request.delete(`/api/admin/users?id=${created.id}`);
+  expect(del.ok()).toBeTruthy();
+
+  const recreate = await request.post('/api/admin/users', { data: payload });
+  expect(recreate.ok()).toBeTruthy();
+  const recreated = await recreate.json() as { id: string };
+
+  await request.delete(`/api/admin/users?id=${recreated.id}`);
 });

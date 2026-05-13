@@ -2,6 +2,17 @@ import { getSession } from '../../lib/auth';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 
+const mobileLinks = [
+  { href: '/', label: '主頁' },
+  { href: '/clients', label: '客戶' },
+  { href: '/policies', label: '保單' },
+  { href: '/claims', label: 'Claim' },
+  { href: '/reminders', label: '提醒' },
+  { href: '/ai', label: 'AI' },
+  { href: '/head', label: '業績' },
+  { href: '/head/agents', label: 'Agent' },
+];
+
 export default async function HeadLayout({ children }: { children: React.ReactNode }) {
   const user = await getSession();
   if (!user || user.role === 'agent') redirect('/');
@@ -23,14 +34,20 @@ export default async function HeadLayout({ children }: { children: React.ReactNo
         </nav>
       </aside>
       <main className="flex-1 p-4 md:p-6 max-w-4xl w-full mx-auto">
-        {/* Mobile admin shortcut */}
-        {isAdmin && (
-          <div className="md:hidden mb-4">
-            <Link href="/admin/settings" className="inline-flex items-center gap-1.5 text-xs bg-amber-50 border border-amber-200 text-amber-800 px-3 py-1.5 rounded-full">
-              🔑 系統設定
-            </Link>
+        <div className="md:hidden -mx-4 px-4 pb-3 mb-4 overflow-x-auto">
+          <div className="flex items-center gap-2 min-w-max text-sm">
+            {mobileLinks.map(link => (
+              <Link key={link.href} href={link.href} className="px-3 py-1.5 bg-white border border-gray-200 rounded-full shadow-sm">
+                {link.label}
+              </Link>
+            ))}
+            {isAdmin && (
+              <Link href="/admin/settings" className="px-3 py-1.5 bg-amber-50 border border-amber-200 text-amber-800 rounded-full shadow-sm">
+                設定
+              </Link>
+            )}
           </div>
-        )}
+        </div>
         {children}
       </main>
     </div>
