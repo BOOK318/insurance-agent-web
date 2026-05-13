@@ -58,3 +58,14 @@ test('prefers insured mobile when agent mobile appears earlier on the same extra
 
   assert.equal(result.client.phone, '+852 91234567');
 });
+
+test('rejects policy clause text after insured label as a client name', () => {
+  const text = '受保人：身故及保單權益給人於預繳保費戶口餘額 如有 作出或預提取之條件及條款 請參閱本建議書內之「基本計劃」說明摘要 預繳保費戶口。保單號碼：13IHK0520240709170101 保險公司：BOC Life 產品名稱：終身壽險計劃';
+
+  const result = extractClientAndPolicyFromPolicyText(text);
+
+  assert.equal(result.client.name_zh, undefined);
+  assert.equal(result.client.phone, undefined);
+  assert.equal(result.policy.insured_name, undefined);
+  assert.equal(result.policy.policy_number, '13IHK0520240709170101');
+});

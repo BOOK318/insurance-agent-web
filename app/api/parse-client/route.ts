@@ -122,6 +122,19 @@ function matchLabel(text: string, labels: string[]) {
   return text.match(re)?.[1]?.trim() ?? null;
 }
 
+function isPlausibleClientName(value: string | null) {
+  if (!value) return false;
+  const cleaned = value
+    .replace(/[，,。；;|].*$/u, '')
+    .trim();
+  if (!cleaned || cleaned.length > 60) return false;
+  if (/(保單|保費|權益|條款|保障|計劃|預繳|退保|現金價值|利率|身故|摘要|建議書|申請|%|\d{4,})/u.test(cleaned)) {
+    return false;
+  }
+  return /^[\u4e00-\u9fff]{2,8}$/u.test(cleaned) ||
+    /^[A-Za-z][A-Za-z.'-]*(?:\s+[A-Za-z][A-Za-z.'-]*){1,5}$/.test(cleaned);
+}
+
 function fastExtractClientFields(text: string) {
   const fields: ExtractedClientFields = {};
   const normalized = normalizeExtractedText(text);
@@ -133,7 +146,7 @@ function fastExtractClientFields(text: string) {
   if (phone) fields.phone = `+852 ${phone.replace(/\D/g, '')}`;
 
   const name = matchLabel(normalized, ['Chinese name', 'Client name', 'Full name', 'Name', '姓名', '客戶姓名', '中文姓名', '英文姓名']);
-  if (name) {
+  if (isPlausibleClientName(name)) {
     fields[/[\u4e00-\u9fff]/.test(name) ? 'name_zh' : 'name_en'] = name;
   }
 
@@ -273,19 +286,27 @@ export async function POST(req: NextRequest) {
         policy?: PolicyDraft;
       };
       const fast = fastExtractClientFields(text);
-      const fields = {
+      const policy = hasPolicyDraft(policyPdf.policy) ? policyPdf.policy : null;
+      let fields = {
         ...fast.fields,
         ...(policyPdf.client ?? {}),
       };
-      const policy = hasPolicyDraft(policyPdf.policy) ? policyPdf.policy : null;
+      if (policy) {
+        const { name_zh: _nameZh, name_en: _nameEn, phone: _phone, ...nonIdentityFields } = fields;
+        fields = {
+          ...nonIdentityFields,
+          ...(policyPdf.client ?? {}),
+        };
+        return NextResponse.json({ ...fields, policy });
+      }
       if (fast.count >= 2) {
-        return NextResponse.json(policy ? { ...fields, policy } : fields);
+        return NextResponse.json(fields);
       }
 
       const prompt = `PDF文件內容：\n${text.slice(0, 8000)}\n\n請從這份PDF提取客戶資料，以指定 JSON 格式回覆。`;
       const rawResponse = await callOllama(TEXT_MODEL, prompt);
       const data = parseJSON(rawResponse);
-      return NextResponse.json(policy ? { ...data, ...fields, policy } : { ...data, ...fields });
+      return NextResponse.json({ ...data, ...fields });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       if (msg.includes('fetch failed') || msg.includes('ECONNREFUSED')) {
