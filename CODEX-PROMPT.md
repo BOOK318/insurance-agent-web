@@ -19,6 +19,23 @@ Please clone the repo, read the setup docs, install the required local services,
 start the app, verify it is runnable, and leave me with the local URL and any
 external tunnel URL.
 
+If I provide an `insurance-agent-data-*.tar.gz` package path or private download
+URL, use the repo bootstrap script after clone:
+
+```bash
+scripts/codex-bootstrap.sh /path/to/insurance-agent-data-....tar.gz
+```
+
+or:
+
+```bash
+DATA_PACKAGE_URL="https://private-download-url/insurance-agent-data.tar.gz" \
+  scripts/codex-bootstrap.sh
+```
+
+This is the preferred path because it restores the database knowledge backup
+instead of re-reading all PDFs.
+
 ### 1. Clone and inspect
 
 ```bash
@@ -31,6 +48,7 @@ git status -sb
 Read these files before changing anything:
 
 ```text
+README.md
 MAC-MINI-INSTALL-GUIDE.md
 WHISPER-MAC-MINI.md
 SETUP-GUIDE.md
@@ -51,6 +69,8 @@ Understand the app first:
   filtering before anything goes to Claude.
 - Whisper runs locally for voice transcription.
 - Web Push uses VAPID keys and works best through HTTPS, especially on iPhone.
+- BOC portal/product/process knowledge lives in PostgreSQL table
+  `company_knowledge`; restore/import this data before testing `/ai`.
 
 ### 2. Install prerequisites on macOS
 
@@ -261,6 +281,43 @@ Open:
 http://localhost:3000
 ```
 
+### 6.1 Restore or import knowledge data
+
+The AI assistant retrieves BOC/product/process information from
+`company_knowledge`. The local model does not permanently learn this by itself.
+
+If I provide a `db-*.sql.gz` backup, restore it on the fresh machine before
+final verification:
+
+```bash
+docker compose --env-file .env -f docker-compose.prod.yml up -d db
+docker compose --env-file .env -f docker-compose.prod.yml exec -T db \
+  psql -U admin -d insurance \
+  -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+gunzip -c backups/db-YYYY-MM-DDTHH-MM-SSZ.sql.gz | \
+  docker compose --env-file .env -f docker-compose.prod.yml exec -T db \
+  psql -U admin -d insurance
+docker compose --env-file .env -f docker-compose.prod.yml up -d migrate app worker backup
+```
+
+If there is no DB backup but `knowledge-base` files exist, import them:
+
+```bash
+npm install
+DATABASE_URL="postgres://admin:<DB_PASSWORD>@127.0.0.1:5432/insurance" \
+  node scripts/import-boc-portal-knowledge.mjs
+DATABASE_URL="postgres://admin:<DB_PASSWORD>@127.0.0.1:5432/insurance" \
+  node scripts/import-boc-pdf-text.mjs
+```
+
+Verify:
+
+```bash
+docker compose --env-file .env -f docker-compose.prod.yml exec db \
+  psql -U admin -d insurance \
+  -c "SELECT COUNT(*) FROM company_knowledge WHERE is_active = TRUE;"
+```
+
 Default local login:
 
 ```text
@@ -358,6 +415,8 @@ When finished, report:
 - Local URL and external HTTPS/tunnel URL if available.
 - Whether Ollama is running and both 7B models are installed.
 - Whether Whisper is running and which model is loaded (`small` or `medium`).
+- Whether `company_knowledge` has active rows and `/ai` can answer a BOC
+  knowledge question.
 - Whether VAPID public key is visible from `/api/push/public-key`.
 - Any failing command and the exact reason.
 

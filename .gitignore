@@ -7,3 +7,8 @@ storage/
 test-results/
 playwright-report/
 backups/
+deployment-data/
+
+# Internal/proprietary portal exports. Keep these out of public GitHub.
+knowledge-base/boc-portal*.json
+knowledge-base/raw-pdfs/boc-portal/

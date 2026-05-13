@@ -1,28 +1,35 @@
 'use client';
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const router = useRouter();
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     setError('');
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
 
-    const res = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
-    });
+      const data = await res.json() as { error?: string; redirectTo?: string };
+      if (!res.ok) {
+        setError(data.error ?? '登入失敗');
+        setLoading(false);
+        return;
+      }
 
-    const data = await res.json() as { error?: string; redirectTo?: string };
-    if (!res.ok) { setError(data.error ?? '登入失敗'); setLoading(false); return; }
-    router.push(data.redirectTo ?? '/');
+      window.location.assign(data.redirectTo ?? '/');
+    } catch {
+      setError('網絡錯誤，請重試');
+      setLoading(false);
+    }
   }
 
   return (

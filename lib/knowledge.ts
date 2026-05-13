@@ -26,6 +26,16 @@ function scoreKnowledge(row: KnowledgeRow, query: string) {
   for (const term of ['claim', '索償', '理賠', '賠償', '醫療', '危疾', 'vhis', '自願醫保', '核保', '聯絡', 'hotline']) {
     if (q.includes(term) && haystack.includes(term)) score += 3;
   }
+  for (const term of ['推廣活動', '產品資訊', '常用表格', '培訓資訊', '業務公告', '代理招聘', '銷售品質', '強積金', '業務伙伴', '業務夥伴', '一脈互動', '其他資訊']) {
+    if (!q.includes(term)) continue;
+    if (row.title.toLowerCase().includes(term)) score += 8;
+    else if (haystack.includes(term)) score += 4;
+  }
+  for (const term of ['表格', '課程', '培訓', '佣金', '招聘', '通告', '活動', '文件']) {
+    if (!q.includes(term)) continue;
+    if (row.title.toLowerCase().includes(term)) score += 3;
+    else if (haystack.includes(term)) score += 2;
+  }
   return score;
 }
 

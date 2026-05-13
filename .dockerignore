@@ -14,5 +14,10 @@ docker-compose*.yml
 coverage
 .DS_Store
 Thumbs.db
+backups
+deployment-data
+storage
+knowledge-base/boc-portal*.json
+knowledge-base/raw-pdfs/boc-portal
 README.md
 SETUP-GUIDE.md

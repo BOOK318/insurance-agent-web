@@ -6,6 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "import:boc-portal": "node scripts/import-boc-portal-knowledge.mjs",
+    "import:boc-pdf-text": "node scripts/import-boc-pdf-text.mjs",
     "migrate": "node-pg-migrate -d DATABASE_URL up",
     "migrate:down": "node-pg-migrate -d DATABASE_URL down",
     "migrate:create": "node-pg-migrate create",

@@ -21,6 +21,8 @@ mkdir -p "$BACKUP_DIR"
 
 DB_FILE="$BACKUP_DIR/db-$STAMP.sql.gz"
 DOCS_FILE="$BACKUP_DIR/docs-$STAMP.tar.gz"
+DB_TMP="$DB_FILE.tmp"
+DOCS_TMP="$DOCS_FILE.tmp"
 
 notify_failure() {
   local msg="$1"
@@ -36,12 +38,14 @@ notify_failure() {
 trap 'notify_failure "unexpected error on line $LINENO"' ERR
 
 echo "[backup] $STAMP — dumping database"
-pg_dump --no-owner --no-acl | gzip -9 > "$DB_FILE"
+pg_dump --no-owner --no-acl | gzip -9 > "$DB_TMP"
+mv "$DB_TMP" "$DB_FILE"
 
 if [[ -d "${DOCUMENT_STORAGE_DIR:-/storage/documents}" ]]; then
   echo "[backup] archiving uploaded documents"
-  tar -czf "$DOCS_FILE" -C "$(dirname "${DOCUMENT_STORAGE_DIR:-/storage/documents}")" \
+  tar -czf "$DOCS_TMP" -C "$(dirname "${DOCUMENT_STORAGE_DIR:-/storage/documents}")" \
     "$(basename "${DOCUMENT_STORAGE_DIR:-/storage/documents}")"
+  mv "$DOCS_TMP" "$DOCS_FILE"
 fi
 
 echo "[backup] pruning archives older than $RETENTION days"

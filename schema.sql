@@ -2,6 +2,8 @@
 -- InsuranceAI — Local PostgreSQL Schema
 -- =============================================
 
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
 -- 用戶（Agent + Head + Admin）
 CREATE TABLE users (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -20,6 +22,7 @@ CREATE TABLE clients (
   name_zh TEXT,
   name_en TEXT,
   hkid TEXT,
+  hkid_encrypted BYTEA,
   dob DATE,
   gender TEXT CHECK (gender IN ('M','F','Other')),
   nationality TEXT,
@@ -40,6 +43,7 @@ CREATE TABLE clients (
   property_notes TEXT,
   preferences TEXT,
   notes TEXT,
+  deleted_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -72,6 +76,7 @@ CREATE TABLE policies (
   status TEXT DEFAULT 'active',
   beneficiaries TEXT,
   notes TEXT,
+  deleted_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -91,6 +96,7 @@ CREATE TABLE claims (
   current_step TEXT,
   documents_required TEXT,
   notes TEXT,
+  deleted_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -105,6 +111,7 @@ CREATE TABLE reminders (
   message TEXT,
   remind_at TIMESTAMPTZ NOT NULL,
   is_sent BOOLEAN DEFAULT FALSE,
+  pushed_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -139,6 +146,52 @@ CREATE TABLE conversations (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- 審計日誌
+CREATE TABLE audit_logs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  actor_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+  action TEXT NOT NULL,
+  target_type TEXT,
+  target_id UUID,
+  metadata JSONB,
+  ip TEXT,
+  user_agent TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 文件附件
+CREATE TABLE documents (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  agent_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  client_id UUID REFERENCES clients(id) ON DELETE CASCADE,
+  policy_id UUID REFERENCES policies(id) ON DELETE CASCADE,
+  claim_id UUID REFERENCES claims(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  file_name TEXT NOT NULL,
+  mime_type TEXT NOT NULL,
+  size_bytes BIGINT NOT NULL,
+  storage_key TEXT NOT NULL,
+  sha256 TEXT,
+  notes TEXT,
+  deleted_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  CONSTRAINT documents_at_least_one_parent CHECK (
+    client_id IS NOT NULL OR policy_id IS NOT NULL OR claim_id IS NOT NULL
+  )
+);
+
+-- Web Push 訂閱
+CREATE TABLE push_subscriptions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  endpoint TEXT NOT NULL UNIQUE,
+  p256dh TEXT NOT NULL,
+  auth TEXT NOT NULL,
+  user_agent TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  last_used TIMESTAMPTZ
+);
+
 -- Durable login throttling (key is sha256(ip + email), not plaintext PII)
 CREATE TABLE login_attempts (
   key TEXT PRIMARY KEY,
@@ -150,11 +203,21 @@ CREATE TABLE login_attempts (
 
 -- Indexes
 CREATE INDEX idx_clients_agent ON clients(agent_id);
+CREATE INDEX idx_clients_agent_active ON clients(agent_id) WHERE deleted_at IS NULL;
 CREATE INDEX idx_clients_dob ON clients(dob);
 CREATE INDEX idx_policies_agent ON policies(agent_id);
+CREATE INDEX idx_policies_agent_active ON policies(agent_id) WHERE deleted_at IS NULL;
 CREATE INDEX idx_policies_expiry ON policies(expiry_date);
 CREATE INDEX idx_claims_agent ON claims(agent_id);
+CREATE INDEX idx_claims_agent_active ON claims(agent_id) WHERE deleted_at IS NULL;
 CREATE INDEX idx_reminders_agent ON reminders(agent_id, remind_at, is_sent);
+CREATE INDEX idx_audit_logs_actor_created_at ON audit_logs(actor_user_id, created_at);
+CREATE INDEX idx_audit_logs_action_created_at ON audit_logs(action, created_at);
+CREATE INDEX idx_documents_agent_active ON documents(agent_id) WHERE deleted_at IS NULL;
+CREATE INDEX idx_documents_client_active ON documents(client_id) WHERE deleted_at IS NULL;
+CREATE INDEX idx_documents_policy_active ON documents(policy_id) WHERE deleted_at IS NULL;
+CREATE INDEX idx_documents_claim_active ON documents(claim_id) WHERE deleted_at IS NULL;
+CREATE INDEX idx_push_subscriptions_user_id ON push_subscriptions(user_id);
 CREATE INDEX idx_login_attempts_locked ON login_attempts(locked_until);
 CREATE INDEX idx_login_attempts_first_failure ON login_attempts(first_failure_at);
 
