@@ -3,6 +3,7 @@ import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Camera, FileText, Loader2, Save, X } from 'lucide-react';
 import Link from 'next/link';
+import { buildPolicyPayloadForClient, hasUsablePolicyDraft } from '../../../../lib/policy-draft.mjs';
 
 interface ClientFields {
   name_zh: string;
@@ -194,7 +195,12 @@ export default function NewClientPage() {
       if (!res.ok) throw new Error();
       const client = await res.json() as { id: string };
       if (pendingPolicy && hasUsablePolicyDraft(pendingPolicy)) {
-        await createPolicyForClient(client.id, pendingPolicy);
+        const clientName = fields.name_zh || fields.name_en;
+        await createPolicyForClient(client.id, {
+          ...pendingPolicy,
+          policyholder_name: pendingPolicy.policyholder_name || clientName,
+          insured_name: pendingPolicy.insured_name || clientName,
+        });
       }
       router.push(`/clients/${client.id}`);
     } catch {
@@ -453,46 +459,14 @@ function fileToBase64(file: File): Promise<string> {
   });
 }
 
-function hasUsablePolicyDraft(policy: PolicyDraft) {
-  return Boolean(policy.policy_number || policy.company || policy.product_name);
-}
-
-function textOrNull(value: string | number | null | undefined) {
-  if (value === null || value === undefined) return null;
-  const text = String(value).trim();
-  return text || null;
-}
-
-function numberOrNull(value: string | number | null | undefined) {
-  if (value === null || value === undefined || value === '') return null;
-  const number = Number(value);
-  return Number.isFinite(number) ? number : null;
-}
-
 async function createPolicyForClient(clientId: string, policy: PolicyDraft) {
-  if (!policy.policy_number || !policy.company) return;
+  const payload = buildPolicyPayloadForClient(clientId, policy);
+  if (!payload) return;
 
   const res = await fetch('/api/policies', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      client_id: clientId,
-      policy_number: String(policy.policy_number).trim(),
-      company: textOrNull(policy.company),
-      type: textOrNull(policy.type) || '其他',
-      product_name: textOrNull(policy.product_name),
-      currency: textOrNull(policy.currency) || 'HKD',
-      premium: numberOrNull(policy.premium),
-      premium_frequency: textOrNull(policy.premium_frequency),
-      sum_assured: numberOrNull(policy.sum_assured),
-      death_benefit: numberOrNull(policy.death_benefit),
-      policyholder_name: textOrNull(policy.policyholder_name),
-      insured_name: textOrNull(policy.insured_name),
-      start_date: textOrNull(policy.start_date),
-      expiry_date: textOrNull(policy.expiry_date),
-      status: 'active',
-      notes: textOrNull(policy.notes) || '由客戶 PDF 上載時同步建立，請覆核保單資料。',
-    }),
+    body: JSON.stringify(payload),
   });
 
   if (!res.ok) {

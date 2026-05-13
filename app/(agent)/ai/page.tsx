@@ -44,11 +44,13 @@ const SUGGESTIONS = [
 ];
 
 const MAX_FILE_TEXT_CHARS = 12000;
+const SALES_ADVICE_PROMPT = '請即刻根據目前載入嘅客戶資料，提供銷售建議。請包括：保障缺口、優先跟進產品方向、下一步提問、WhatsApp 跟進訊息。';
 
 function AIChat() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const clientId = searchParams.get('client');
+  const mode = searchParams.get('mode');
   const clientNameParam = searchParams.get('name');
 
   const [messages, setMessages] = useState<Message[]>([{
@@ -79,8 +81,10 @@ function AIChat() {
   const fileRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const recorderRef = useRef<WavRecorder | null>(null);
+  const autoSalesAdviceRef = useRef(false);
 
   useEffect(() => {
+    if (clientId && mode === 'sales-advice') return;
     fetch('/api/ai')
       .then(r => r.ok ? r.json() : null)
       .then((data: { messages?: Message[] } | null) => {
@@ -92,7 +96,7 @@ function AIChat() {
         }
       })
       .catch(() => {});
-  }, []);
+  }, [clientId, mode]);
 
   // Load display data only; /api/ai resolves the owned client row server-side.
   useEffect(() => {
@@ -107,9 +111,13 @@ function AIChat() {
           role: 'assistant',
           content: `已載入 ${displayName} 嘅資料。請問有咩需要我幫手分析？`,
         }]);
+        if (mode === 'sales-advice' && !autoSalesAdviceRef.current) {
+          autoSalesAdviceRef.current = true;
+          void send(SALES_ADVICE_PROMPT, clientId);
+        }
       })
       .catch(() => {});
-  }, [clientId]);
+  }, [clientId, mode]);
 
   useEffect(() => {
     scrollerRef.current?.scrollTo({ top: scrollerRef.current.scrollHeight, behavior: 'smooth' });
@@ -257,7 +265,7 @@ function AIChat() {
   }
 
   // ── Send ─────────────────────────────────────────────────
-  async function send(text?: string) {
+  async function send(text?: string, clientIdOverride?: string | null) {
     const msg = (text ?? input).trim();
     if ((!msg && !pendingImage && !pendingDocument) || loading) return;
 
@@ -287,7 +295,7 @@ function AIChat() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           messages: newMessages,
-          clientId: activeClientId ?? undefined,
+          clientId: clientIdOverride ?? activeClientId ?? undefined,
         }),
       });
       const data = await res.json() as {

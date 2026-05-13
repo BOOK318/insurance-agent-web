@@ -84,6 +84,17 @@ function normalizeExtractedText(text: string) {
   return text.replace(/\u0000/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
+function normalizeExtractedPdfText(text: string) {
+  return text
+    .replace(/\u0000/g, ' ')
+    .split('\n')
+    .map(line => line.replace(/[ \t]+/g, ' ').trim())
+    .filter(Boolean)
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 function normalizeAmount(value: string) {
   const clean = value.replace(/[, HKD$]/gi, '').trim();
   const n = Number(clean);
@@ -192,12 +203,25 @@ async function extractPdfText(file: Blob) {
   for (let i = 1; i <= doc.numPages; i += 1) {
     const page = await doc.getPage(i);
     const content = await page.getTextContent();
-    const pageText = content.items.map((item) => ('str' in item ? item.str : '')).join(' ');
-    const normalized = normalizeExtractedText(pageText);
+    const rows = new Map<number, Array<{ x: number; text: string }>>();
+    for (const item of content.items) {
+      if (!('str' in item) || !item.str.trim()) continue;
+      const transform = 'transform' in item && Array.isArray(item.transform) ? item.transform : null;
+      const x = Number(transform?.[4] ?? 0);
+      const y = Math.round(Number(transform?.[5] ?? 0));
+      const row = rows.get(y) ?? [];
+      row.push({ x, text: item.str });
+      rows.set(y, row);
+    }
+    const pageText = [...rows.entries()]
+      .sort(([a], [b]) => b - a)
+      .map(([, row]) => row.sort((a, b) => a.x - b.x).map(item => item.text).join(' '))
+      .join('\n');
+    const normalized = normalizeExtractedPdfText(pageText);
     if (normalized) pages.push(`[P${i}] ${normalized}`);
   }
 
-  return normalizeExtractedText(pages.join('\n'));
+  return normalizeExtractedPdfText(pages.join('\n'));
 }
 
 async function callOllama(

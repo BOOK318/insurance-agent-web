@@ -300,7 +300,7 @@ export default async function ClientDetailPage({
       <DocumentsSection clientId={id} />
 
       {/* AI Button */}
-      <Link href={`/ai?client=${id}`}
+      <Link href={`/ai?client=${id}&mode=sales-advice`}
         className="flex items-center justify-center gap-2 w-full bg-blue-700 text-white py-3.5 rounded-2xl font-semibold hover:bg-blue-800 transition">
         <Sparkles size={16} /> AI 銷售建議
       </Link>

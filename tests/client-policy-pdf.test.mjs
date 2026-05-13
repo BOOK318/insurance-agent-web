@@ -69,3 +69,34 @@ test('rejects policy clause text after insured label as a client name', () => {
   assert.equal(result.policy.insured_name, undefined);
   assert.equal(result.policy.policy_number, '13IHK0520240709170101');
 });
+
+test('extracts Chinese proposal addressee under salutation as client name', () => {
+  const text = `
+    中銀人壽保險有限公司
+    中文建議書
+    敬啟者
+    陳大文 先生
+    建議書編號：13IHK0520240709170101
+    保險公司：BOC Life
+    產品名稱：終身壽險計劃
+  `;
+
+  const result = extractClientAndPolicyFromPolicyText(text);
+
+  assert.equal(result.client.name_zh, '陳大文');
+  assert.equal(result.policy.policyholder_name, '陳大文');
+  assert.equal(result.policy.insured_name, '陳大文');
+});
+
+test('normalizes PDF compatibility CJK glyphs in proposal addressee name', () => {
+  const text = `
+    敬啟者
+    陳 ⼤ ⽂ 先 ⽣
+    建議書編號：13IHK0520240709170101
+    保險公司：BOC Life
+  `;
+
+  const result = extractClientAndPolicyFromPolicyText(text);
+
+  assert.equal(result.client.name_zh, '陳大文');
+});
