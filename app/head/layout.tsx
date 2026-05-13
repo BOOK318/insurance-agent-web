@@ -46,6 +46,11 @@ export default async function HeadLayout({ children }: { children: React.ReactNo
                 設定
               </Link>
             )}
+            {isAdmin && (
+              <Link href="/admin/knowledge" className="px-3 py-1.5 bg-amber-50 border border-amber-200 text-amber-800 rounded-full shadow-sm">
+                AI知識
+              </Link>
+            )}
           </div>
         </div>
         {children}

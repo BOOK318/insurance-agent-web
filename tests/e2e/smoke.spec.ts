@@ -199,6 +199,7 @@ test('admin mobile pages expose main navigation links', async ({ page }) => {
   await expect(page.getByRole('link', { name: '客戶' })).toBeVisible();
   await expect(page.getByRole('link', { name: '保單' })).toBeVisible();
   await expect(page.getByRole('link', { name: '業績' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'AI知識' })).toBeVisible();
 });
 
 test('admin settings no longer exposes Anthropic API key editing', async ({ page }) => {
@@ -233,4 +234,33 @@ test('admin can delete a user and recreate the same email', async ({ request }) 
   const recreated = await recreate.json() as { id: string };
 
   await request.delete(`/api/admin/users?id=${recreated.id}`);
+});
+
+test('admin can add and delete AI sales knowledge', async ({ request }) => {
+  await request.post('/api/auth/login', { data: ADMIN });
+  const title = `測試銷售話術 ${Date.now()}`;
+  const content = '如果客戶話其他公司回報較好，先認同客戶重視回報，再引導比較公司背景、公信力、保證及非保證部分，所有數字以最新核准材料為準。';
+
+  const create = await request.post('/api/admin/knowledge', {
+    data: {
+      company: 'BOC Life',
+      title,
+      content,
+    },
+  });
+  expect(create.ok()).toBeTruthy();
+  const created = await create.json() as { id: string };
+
+  const list = await request.get('/api/admin/knowledge');
+  expect(list.ok()).toBeTruthy();
+  const rows = await list.json() as Array<{ id: string; title: string; content: string; is_active: boolean }>;
+  expect(rows.some(row => row.id === created.id && row.title === title && row.content.includes('公信力'))).toBeTruthy();
+
+  const disable = await request.patch('/api/admin/knowledge', {
+    data: { id: created.id, is_active: false },
+  });
+  expect(disable.ok()).toBeTruthy();
+
+  const del = await request.delete(`/api/admin/knowledge?id=${created.id}`);
+  expect(del.ok()).toBeTruthy();
 });

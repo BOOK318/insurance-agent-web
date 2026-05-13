@@ -47,6 +47,11 @@ function scoreKnowledge(row: KnowledgeRow, query: string) {
   for (const term of ['break even', 'breakeven', '回本', '收支平衡', '供款', '保費', '現金價值', '身故', 'death benefit', 'cash value']) {
     if (q.includes(term.toLowerCase()) && haystack.includes(term.toLowerCase())) score += 4;
   }
+  for (const term of ['銷售', '話術', '異議', '點覆', '點回覆', '客戶話', '其他公司', '回報更好', '回報好啲', '公信力', '大水喉', '實現率', '派息', '競爭對手', '比較']) {
+    if (!q.includes(term.toLowerCase())) continue;
+    if (row.category === 'sales') score += 10;
+    if (haystack.includes(term.toLowerCase())) score += 6;
+  }
 
   const tokens = q
     .split(/[^\p{L}\p{N}]+/u)

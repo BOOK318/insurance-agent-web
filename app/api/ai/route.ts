@@ -393,7 +393,7 @@ export async function POST(req: NextRequest) {
 
   const knowledgeContext = await getRelevantKnowledgeContext(lastUserText);
   if (knowledgeContext) {
-    systemPrompt += `\n\n公司知識庫（本地整理，只作 agent 參考；產品條款以官方保單文件為準）：\n${knowledgeContext}`;
+    systemPrompt += `\n\n公司知識庫（本地整理，只作 agent 參考；產品條款以官方保單文件為準）：\n${knowledgeContext}\n\n使用知識庫規則：可用銷售話術作為回覆框架，但唔好講保證回報、唔好貶低其他公司為「一定做唔到」。涉及實現率、派息、回報率、償付能力等數字時，要提醒 agent 以公司最新核准材料為準。`;
   }
 
   // ── STEP 5: Resolve API key & build Anthropic client ──

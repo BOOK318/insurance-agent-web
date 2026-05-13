@@ -126,7 +126,7 @@ CREATE TABLE settings (
 CREATE TABLE company_knowledge (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   company TEXT NOT NULL,
-  category TEXT NOT NULL CHECK (category IN ('product','underwriting','application','claims','contact','process','other')),
+  category TEXT NOT NULL CHECK (category IN ('product','underwriting','application','claims','contact','process','sales','other')),
   product_name TEXT,
   title TEXT NOT NULL,
   content TEXT NOT NULL,
