@@ -16,6 +16,7 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { getSession } from '../../../lib/auth';
 import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist/legacy/build/pdf.mjs';
+import { extractClientAndPolicyFromPolicyText } from '../../../lib/client-policy-pdf.mjs';
 
 export const runtime = 'nodejs';
 
@@ -77,6 +78,7 @@ interface OllamaResponse {
 }
 
 type ExtractedClientFields = Record<string, string | number | null>;
+type PolicyDraft = Record<string, string | number | null | undefined>;
 
 function normalizeExtractedText(text: string) {
   return text.replace(/\u0000/g, ' ').replace(/\s+/g, ' ').trim();
@@ -162,6 +164,11 @@ function fastExtractClientFields(text: string) {
     fields,
     count: Object.values(fields).filter(v => v !== null && v !== '').length,
   };
+}
+
+function hasPolicyDraft(policy: PolicyDraft | undefined) {
+  if (!policy) return false;
+  return Boolean(policy.policy_number || policy.company || policy.product_name);
 }
 
 async function extractPdfText(file: Blob) {
@@ -261,15 +268,24 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'PDF 沒有可讀文字，請改用拍照掃描' }, { status: 422 });
       }
 
+      const policyPdf = extractClientAndPolicyFromPolicyText(text) as unknown as {
+        client?: ExtractedClientFields;
+        policy?: PolicyDraft;
+      };
       const fast = fastExtractClientFields(text);
+      const fields = {
+        ...fast.fields,
+        ...(policyPdf.client ?? {}),
+      };
+      const policy = hasPolicyDraft(policyPdf.policy) ? policyPdf.policy : null;
       if (fast.count >= 2) {
-        return NextResponse.json(fast.fields);
+        return NextResponse.json(policy ? { ...fields, policy } : fields);
       }
 
       const prompt = `PDF文件內容：\n${text.slice(0, 8000)}\n\n請從這份PDF提取客戶資料，以指定 JSON 格式回覆。`;
       const rawResponse = await callOllama(TEXT_MODEL, prompt);
       const data = parseJSON(rawResponse);
-      return NextResponse.json(data);
+      return NextResponse.json(policy ? { ...data, ...fields, policy } : { ...data, ...fields });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       if (msg.includes('fetch failed') || msg.includes('ECONNREFUSED')) {

@@ -27,6 +27,29 @@ interface ClientFields {
   notes: string;
 }
 
+interface PolicyDraft {
+  policy_number?: string | number | null;
+  company?: string | null;
+  type?: string | null;
+  product_name?: string | null;
+  currency?: string | null;
+  premium?: string | number | null;
+  premium_frequency?: string | null;
+  sum_assured?: string | number | null;
+  death_benefit?: string | number | null;
+  policyholder_name?: string | null;
+  insured_name?: string | null;
+  start_date?: string | null;
+  expiry_date?: string | null;
+  notes?: string | null;
+}
+
+interface ParseClientResponse extends Partial<ClientFields> {
+  error?: string;
+  ollamaDown?: boolean;
+  policy?: PolicyDraft | null;
+}
+
 const EMPTY: ClientFields = {
   name_zh: '', name_en: '', phone: '', email: '',
   occupation: '', annual_income: '', dob: '', gender: '', nationality: '',
@@ -43,6 +66,7 @@ export default function NewClientPage() {
   const [error, setError] = useState('');
   const [toast, setToast] = useState('');
   const [quickSaveReady, setQuickSaveReady] = useState(false);
+  const [pendingPolicy, setPendingPolicy] = useState<PolicyDraft | null>(null);
   const cameraFileRef = useRef<HTMLInputElement>(null);
   const pdfFileRef = useRef<HTMLInputElement>(null);
 
@@ -87,7 +111,7 @@ export default function NewClientPage() {
         method: 'POST',
         body: form,
       });
-      const data = await res.json() as Partial<ClientFields> & { error?: string; ollamaDown?: boolean };
+      const data = await res.json() as ParseClientResponse;
       if (data.ollamaDown) {
         setError('⚠️ Ollama 未啟動 — 請在 Mac mini 執行：ollama serve');
       } else if (data.error) {
@@ -110,12 +134,12 @@ export default function NewClientPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ imageBase64: base64, mediaType }),
     });
-    const data = await res.json() as Partial<ClientFields>;
+    const data = await res.json() as ParseClientResponse;
     applyParsed(data);
     showToast('✅ 文件掃描完成');
   }
 
-  function applyParsed(data: Partial<ClientFields>) {
+  function applyParsed(data: ParseClientResponse) {
     setFields(prev => ({
       ...prev,
       name_zh: data.name_zh ?? prev.name_zh,
@@ -141,6 +165,9 @@ export default function NewClientPage() {
     }));
     // Show quick-save option if name was extracted
     if (data.name_zh || data.name_en) setQuickSaveReady(true);
+    if (data.policy && hasUsablePolicyDraft(data.policy)) {
+      setPendingPolicy(data.policy);
+    }
   }
 
   // ── Save ─────────────────────────────────────────────────
@@ -166,6 +193,9 @@ export default function NewClientPage() {
       });
       if (!res.ok) throw new Error();
       const client = await res.json() as { id: string };
+      if (pendingPolicy && hasUsablePolicyDraft(pendingPolicy)) {
+        await createPolicyForClient(client.id, pendingPolicy);
+      }
       router.push(`/clients/${client.id}`);
     } catch {
       setError('儲存失敗，請重試');
@@ -227,6 +257,31 @@ export default function NewClientPage() {
               {saving ? '儲存中…' : '直接儲存 →'}
             </button>
           </div>
+        </div>
+      )}
+
+      {pendingPolicy && (
+        <div className="mb-4 bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-amber-950">將會同步新增保單</p>
+            <p className="text-xs text-amber-800 mt-1">
+              {[pendingPolicy.company, pendingPolicy.product_name, pendingPolicy.policy_number ? `#${pendingPolicy.policy_number}` : '']
+                .filter(Boolean)
+                .join(' · ') || '已從 PDF 抽到保單資料'}
+            </p>
+            {(pendingPolicy.insured_name || pendingPolicy.policyholder_name) && (
+              <p className="text-xs text-amber-700 mt-1">
+                受保人：{pendingPolicy.insured_name || pendingPolicy.policyholder_name}
+              </p>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => setPendingPolicy(null)}
+            className="shrink-0 text-xs text-amber-800 px-3 py-1.5 rounded-xl hover:bg-amber-100 transition"
+          >
+            不建立
+          </button>
         </div>
       )}
 
@@ -396,4 +451,52 @@ function fileToBase64(file: File): Promise<string> {
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
+}
+
+function hasUsablePolicyDraft(policy: PolicyDraft) {
+  return Boolean(policy.policy_number || policy.company || policy.product_name);
+}
+
+function textOrNull(value: string | number | null | undefined) {
+  if (value === null || value === undefined) return null;
+  const text = String(value).trim();
+  return text || null;
+}
+
+function numberOrNull(value: string | number | null | undefined) {
+  if (value === null || value === undefined || value === '') return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+async function createPolicyForClient(clientId: string, policy: PolicyDraft) {
+  if (!policy.policy_number || !policy.company) return;
+
+  const res = await fetch('/api/policies', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      client_id: clientId,
+      policy_number: String(policy.policy_number).trim(),
+      company: textOrNull(policy.company),
+      type: textOrNull(policy.type) || '其他',
+      product_name: textOrNull(policy.product_name),
+      currency: textOrNull(policy.currency) || 'HKD',
+      premium: numberOrNull(policy.premium),
+      premium_frequency: textOrNull(policy.premium_frequency),
+      sum_assured: numberOrNull(policy.sum_assured),
+      death_benefit: numberOrNull(policy.death_benefit),
+      policyholder_name: textOrNull(policy.policyholder_name),
+      insured_name: textOrNull(policy.insured_name),
+      start_date: textOrNull(policy.start_date),
+      expiry_date: textOrNull(policy.expiry_date),
+      status: 'active',
+      notes: textOrNull(policy.notes) || '由客戶 PDF 上載時同步建立，請覆核保單資料。',
+    }),
+  });
+
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({})) as { error?: string };
+    throw new Error(data.error || '同步新增保單失敗');
+  }
 }
