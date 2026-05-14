@@ -26,6 +26,7 @@ import { buildAnonymizedContext, detokenize, scrubFreeTextPII } from '../../../l
 import { getSetting } from '../../../lib/settings';
 import { db } from '../../../lib/db';
 import { getRelevantKnowledgeContext } from '../../../lib/knowledge';
+import { appendTruncationNotice, getAiReplyMaxTokens, trimConversationContent } from '../../../lib/ai-response.mjs';
 
 const OLLAMA_URL    = process.env.OLLAMA_URL          ?? 'http://localhost:11434';
 const TEXT_MODEL    = process.env.OLLAMA_MODEL        ?? 'qwen2.5:7b';
@@ -42,7 +43,8 @@ const BASE_SYSTEM = `你係一個專業嘅香港保險Agent AI助手。
 注意：客戶資料會用代號顯示（[CLIENT]、[PHONE] 等）。
 回覆時直接用代號，唔好嘗試猜測或填入真實個人資料。
 
-溝通：用廣東話，簡潔專業。涉及金額用HKD。`;
+溝通：用廣東話，簡潔專業。涉及金額用HKD。
+長分析要用分點同小標題，優先完整覆蓋重點，避免寫成太長散文。`;
 
 interface IncomingMessage {
   role: 'user' | 'assistant';
@@ -58,11 +60,11 @@ interface IntentResult {
 }
 
 async function saveConversation(agentId: string, role: 'user' | 'assistant', content: string) {
-  const trimmed = content.trim();
+  const trimmed = trimConversationContent(content);
   if (!trimmed) return;
   await db.query(
     'INSERT INTO conversations (agent_id, role, content) VALUES ($1, $2, $3)',
-    [agentId, role, trimmed.slice(0, 6000)]
+    [agentId, role, trimmed]
   );
 }
 
@@ -423,14 +425,14 @@ export async function POST(req: NextRequest) {
 
   const response = await anthropic.messages.create({
     model: 'claude-haiku-4-5',
-    max_tokens: 1024,
+    max_tokens: getAiReplyMaxTokens(),
     system: systemPrompt,
     messages: anthropicMessages,
   });
 
   const block = response.content[0];
   const rawReply = block.type === 'text' ? block.text : '...';
-  const reply = detokenize(rawReply, tokenMap);
+  const reply = detokenize(appendTruncationNotice(rawReply, response.stop_reason), tokenMap);
   await saveConversation(user.id, 'assistant', reply);
 
   // Note about how the input was processed (for UI transparency)
