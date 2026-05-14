@@ -315,14 +315,18 @@ test('admin can delete a user and recreate the same email', async ({ request }) 
   expect(create.ok()).toBeTruthy();
   const created = await create.json() as { id: string };
 
-  const del = await request.delete(`/api/admin/users?id=${created.id}`);
+  const del = await request.delete(`/api/admin/users?id=${created.id}`, {
+    data: { confirm_email: email },
+  });
   expect(del.ok()).toBeTruthy();
 
   const recreate = await request.post('/api/admin/users', { data: payload });
   expect(recreate.ok()).toBeTruthy();
   const recreated = await recreate.json() as { id: string };
 
-  await request.delete(`/api/admin/users?id=${recreated.id}`);
+  await request.delete(`/api/admin/users?id=${recreated.id}`, {
+    data: { confirm_email: email },
+  });
 });
 
 test('admin can add and delete AI sales knowledge', async ({ request }) => {
