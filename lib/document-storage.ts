@@ -143,4 +143,13 @@ export async function statDocument(storageKey: string) {
   return fs.stat(full);
 }
 
+export async function purgeAgentDir(agentId: string) {
+  // Defensive: agentId must be a canonical UUID (8-4-4-4-12 hex), and the
+  // resolved path must sit under ROOT — never allow caller-controlled traversal.
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(agentId)) return;
+  const full = path.resolve(ROOT, agentId);
+  if (!full.startsWith(path.resolve(ROOT) + path.sep)) return;
+  await fs.rm(full, { recursive: true, force: true });
+}
+
 export function rootDir() { return ROOT; }

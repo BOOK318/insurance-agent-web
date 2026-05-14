@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-05-14
+
+- Security: admin user delete now requires the target account's email as a typed confirmation, preventing accidental cascade-wipe of every client / policy / claim / document the agent owned.
+- Security: admin user delete records the cascade impact (clients/policies/claims/documents counts) in the audit log so the destruction is recoverable forensically.
+- Security: admin user delete now also purges the agent's document directory on disk so orphan PDFs/images don't linger after a hard delete.
+- Security: hardened the on-disk purge with a strict UUID guard (8-4-4-4-12 hex) plus a path-under-`ROOT` check — caught and fixed during testing where the original looser regex accepted any 32-character hex-ish string.
+- Feature: reminders page is now an email-style inbox — every reminder is listed (read and unread), unread rows show a blue dot, "全部標記為已讀" sweeps all unread to read, and clicking a single reminder Gmail-style marks it read while navigating.
+- Feature: new `POST /api/reminders/mark-all-read` and `PATCH /api/reminders/[id]` endpoints back the inbox actions; both are scoped to the calling agent so cross-tenant marks are no-ops.
+- Behaviour: reminders worker now only writes `pushed_at` after a push (reverted from earlier same-day intent to also write `is_sent`). Read/unread is owned by the user; the worker tracks delivery only.
+- Security: `lib/jwt.ts` now fails fast at module load if `JWT_SECRET` is missing, empty, the public build-time placeholder, or under 32 chars. Replaces a silent fallback where missing env → key was the literal bytes of the string `"undefined"`, which would let anyone forge cookies for any user including admin.
+- Security: the build-time placeholder `build_time_placeholder_change_at_runtime` (which lives in the Dockerfile and the public repo) is now explicitly rejected at runtime, with a carve-out so `next build` still completes (`NEXT_PHASE = phase-production-build` only).
+- Tests: added `tests/purge-agent-dir.test.mjs`, `tests/admin-delete-user.test.mjs`, `tests/worker-reminders.test.mjs`, `tests/reminders-inbox.test.mjs`, and `tests/jwt-secret.test.mjs` covering the on-disk purge contract, the nine control-flow branches of the admin delete handler, the worker's three contract cases (including a guard that throws if the worker ever writes is_sent again), the ten endpoint cases for the inbox model, and the thirteen-case input matrix for the JWT secret validator (missing / empty / placeholder / too-short / valid / build-phase / dev-phase combinations).
+
 ## 2026-05-12
 
 - Security: disabled the framework `X-Powered-By` response header.

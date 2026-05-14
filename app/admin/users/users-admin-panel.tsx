@@ -53,6 +53,7 @@ export function UsersAdminPanel({
   const [resetUserId, setResetUserId] = useState<string | null>(null);
   const [resetPasswordValue, setResetPasswordValue] = useState('');
   const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
+  const [deleteConfirmEmail, setDeleteConfirmEmail] = useState('');
   const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
 
   function set<K extends keyof CreateFields>(key: K, value: CreateFields[K]) {
@@ -118,15 +119,22 @@ export function UsersAdminPanel({
   }
 
   async function deleteUser(user: AdminUserRow) {
+    if (deleteConfirmEmail.trim().toLowerCase() !== user.email.toLowerCase()) {
+      setMsg({ type: 'err', text: '確認 Email 唔啱，請輸入嗰個帳號嘅 Email' });
+      return;
+    }
     setBusyId(user.id);
     setMsg(null);
 
     const res = await fetch(`/api/admin/users?id=${encodeURIComponent(user.id)}`, {
       method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ confirm_email: deleteConfirmEmail.trim() }),
     });
 
     setBusyId(null);
     setDeleteUserId(null);
+    setDeleteConfirmEmail('');
     const data = await res.json().catch(() => ({})) as { error?: string };
     if (!res.ok) {
       setMsg({ type: 'err', text: data.error ?? '刪除帳號失敗' });
@@ -251,6 +259,7 @@ export function UsersAdminPanel({
                   onClick={() => {
                     setMsg(null);
                     setDeleteUserId(user.id);
+                    setDeleteConfirmEmail('');
                   }}
                 >
                   <Trash2 size={15} />
@@ -258,26 +267,44 @@ export function UsersAdminPanel({
               </div>
             </div>
             {deleteUserId === user.id && (
-              <div className="mt-3 border-t border-gray-100 pt-3 flex flex-col sm:flex-row sm:items-center gap-2 text-sm">
-                <p className="text-red-700 flex-1">
-                  確定永久刪除 {user.email}？相關客戶、保單、提醒、對話都會一併刪除。
+              <div className="mt-3 border-t border-gray-100 pt-3 space-y-2 text-sm">
+                <p className="text-red-700">
+                  確定永久刪除 <span className="font-mono">{user.email}</span>？
+                  相關客戶、保單、Claim、提醒、對話、文件都會一併永久刪除。
                 </p>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => deleteUser(user)}
-                    disabled={busyId === user.id}
-                    className="px-3 py-1.5 rounded-lg bg-red-600 text-white font-semibold hover:bg-red-700 disabled:opacity-60"
-                  >
-                    {busyId === user.id ? '刪除中…' : '永久刪除'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setDeleteUserId(null)}
-                    className="px-3 py-1.5 rounded-lg bg-gray-50 text-gray-600 hover:bg-gray-100"
-                  >
-                    取消
-                  </button>
+                <label className="text-xs text-gray-500 block">
+                  輸入 <span className="font-mono">{user.email}</span> 確認刪除
+                </label>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <input
+                    type="email"
+                    value={deleteConfirmEmail}
+                    onChange={e => setDeleteConfirmEmail(e.target.value)}
+                    autoFocus
+                    autoComplete="off"
+                    placeholder={user.email}
+                    className="min-w-0 flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => deleteUser(user)}
+                      disabled={busyId === user.id || deleteConfirmEmail.trim().toLowerCase() !== user.email.toLowerCase()}
+                      className="px-3 py-1.5 rounded-lg bg-red-600 text-white font-semibold hover:bg-red-700 disabled:opacity-50"
+                    >
+                      {busyId === user.id ? '刪除中…' : '永久刪除'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDeleteUserId(null);
+                        setDeleteConfirmEmail('');
+                      }}
+                      className="px-3 py-1.5 rounded-lg bg-gray-50 text-gray-600 hover:bg-gray-100"
+                    >
+                      取消
+                    </button>
+                  </div>
                 </div>
               </div>
             )}

@@ -3,6 +3,7 @@ import { db } from '../../../lib/db';
 import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
 import { formatDate } from '../../../lib/utils';
+import { MarkAllReadButton, ReminderRow } from './inbox-actions';
 
 export default async function RemindersPage() {
   const user = await getSession();
@@ -23,14 +24,16 @@ export default async function RemindersPage() {
     [user.id]
   );
 
-  // Pending reminders
+  // Reminders — inbox-style. Show all rows; unread (is_sent = FALSE) gets a
+  // blue dot in the UI; "Mark all as read" flips them to is_sent = TRUE.
   const { rows: reminders } = await db.query(
     `SELECT r.*, c.name_zh AS client_name_zh, c.name_en AS client_name_en, c.id AS client_id_val
      FROM reminders r LEFT JOIN clients c ON c.id = r.client_id AND c.deleted_at IS NULL
-     WHERE r.agent_id = $1 AND r.is_sent = FALSE
-     ORDER BY r.remind_at ASC`,
+     WHERE r.agent_id = $1
+     ORDER BY COALESCE(r.pushed_at, r.remind_at) DESC`,
     [user.id]
   );
+  const hasUnread = (reminders as Array<{ is_sent: boolean }>).some(r => !r.is_sent);
 
   // Expiring policies (30 days)
   const { rows: expiringPolicies } = await db.query(
@@ -50,7 +53,7 @@ export default async function RemindersPage() {
     <div>
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-xl font-bold">提醒</h1>
-        <button className="text-xs text-blue-700 font-medium">標記全部已讀</button>
+        <MarkAllReadButton hasUnread={hasUnread} />
       </div>
 
       {/* Birthdays */}
@@ -136,28 +139,28 @@ export default async function RemindersPage() {
           <p className="text-sm text-gray-400 px-1">暫時沒有其他提醒</p>
         ) : (
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 divide-y divide-gray-100">
-            {(reminders as Row[]).map(r => (
-              <Link
-                key={r.id as string}
-                href={r.client_id ? `/clients/${r.client_id}` : '#'}
-                className="flex items-center gap-3 p-3.5 hover:bg-gray-50 transition"
-              >
-                <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center text-base shrink-0">
-                  {r.type === 'birthday' ? '🎂'
-                    : r.type === 'policy_expiry' ? '📋'
-                    : r.type === 'follow_up' ? '📞'
-                    : '🔔'}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-gray-900 truncate">{r.title as string}</p>
-                  <p className="text-xs text-gray-500 truncate">
-                    {r.client_name_zh ? `${r.client_name_zh as string} · ` : ''}
-                    {r.remind_at ? formatDate(r.remind_at as string) : ''}
-                  </p>
-                </div>
-                <ChevronRight size={14} className="text-gray-300 shrink-0" />
-              </Link>
-            ))}
+            {(reminders as Row[]).map(r => {
+              const icon =
+                r.type === 'birthday' ? '🎂'
+                : r.type === 'policy_expiry' ? '📋'
+                : r.type === 'follow_up' ? '📞'
+                : '🔔';
+              const subtitleParts: string[] = [];
+              if (r.client_name_zh) subtitleParts.push(r.client_name_zh as string);
+              else if (r.client_name_en) subtitleParts.push(r.client_name_en as string);
+              if (r.remind_at) subtitleParts.push(formatDate(r.remind_at as string));
+              return (
+                <ReminderRow
+                  key={r.id as string}
+                  id={r.id as string}
+                  href={r.client_id ? `/clients/${r.client_id}` : '/reminders'}
+                  unread={!r.is_sent}
+                  icon={icon}
+                  title={r.title as string}
+                  subtitle={subtitleParts.join(' · ')}
+                />
+              );
+            })}
           </div>
         )}
       </section>

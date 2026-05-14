@@ -94,7 +94,10 @@ async function processDueReminders() {
       url: r.client_id ? `/clients/${r.client_id}` : '/reminders',
       tag: 'reminder-' + r.id,
     });
-    await pool.query('UPDATE reminders SET pushed_at = NOW() WHERE id = $1', [r.id]);
+    await pool.query(
+      'UPDATE reminders SET pushed_at = NOW() WHERE id = $1',
+      [r.id],
+    );
     if (rows.length > 0) console.log(`[worker] pushed reminder ${r.id} to agent ${r.agent_id}`);
   }
 }
