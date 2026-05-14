@@ -11,6 +11,7 @@
  */
 
 import assert from 'node:assert/strict';
+import { scheduleBirthdayReminders } from '../worker/reminder-scheduling.mjs';
 
 function mockPool(state) {
   return {
@@ -68,7 +69,28 @@ async function run() {
     assert.equal(state.reminders[0].is_sent, false);
   }
 
-  console.log('worker reminders contract: PASS (3 cases)');
+  // 4. birthday scheduler creates one reminder the day before a client's birthday
+  {
+    const calls = [];
+    const pool = {
+      async query(sql, params) {
+        calls.push({ sql, params });
+        return { rowCount: 1 };
+      },
+    };
+
+    await scheduleBirthdayReminders(pool);
+
+    assert.equal(calls.length, 1);
+    const sql = calls[0].sql;
+    assert.match(sql, /INSERT INTO reminders \(agent_id, client_id, type, title, message, remind_at\)/);
+    assert.match(sql, /'birthday'/);
+    assert.match(sql, /TO_CHAR\(c\.dob, 'MM-DD'\) = TO_CHAR\(\(NOW\(\) \+ INTERVAL '1 day'\), 'MM-DD'\)/);
+    assert.match(sql, /r\.type = 'birthday'/);
+    assert.match(sql, /r\.remind_at::date = CURRENT_DATE/);
+  }
+
+  console.log('worker reminders contract: PASS (4 cases)');
 }
 
 run().catch(err => { console.error(err); process.exit(1); });

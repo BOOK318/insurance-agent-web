@@ -16,6 +16,7 @@ import 'dotenv/config';
 import { config as dotenv } from 'dotenv';
 import pg from 'pg';
 import webpush from 'web-push';
+import { scheduleBirthdayReminders, scheduleExpiringPolicies } from './reminder-scheduling.mjs';
 
 // In dev, also load .env.local explicitly (Node doesn't read it otherwise).
 dotenv({ path: '.env.local' });
@@ -102,48 +103,10 @@ async function processDueReminders() {
   }
 }
 
-/**
- * Auto-create reminders for policies expiring in 30 / 7 / 1 days. We dedupe
- * by writing a sentinel reminder per (policy, threshold) — if it already
- * exists we skip. This way the worker is idempotent and re-running it
- * doesn't double-fire.
- */
-async function scheduleExpiringPolicies() {
-  const thresholds = [30, 7, 1]; // days out
-  for (const days of thresholds) {
-    await pool.query(
-      `INSERT INTO reminders (agent_id, client_id, type, title, message, remind_at)
-       SELECT p.agent_id, p.client_id, 'renewal',
-              '保單到期提醒',
-              CONCAT(
-                COALESCE(p.product_name, p.type),
-                ' · ',
-                COALESCE(c.name_zh, c.name_en, '客戶'),
-                ' · ',
-                $1::int, ' 日後到期'
-              ),
-              NOW()
-       FROM policies p
-       JOIN clients c ON c.id = p.client_id AND c.deleted_at IS NULL
-       WHERE p.deleted_at IS NULL
-         AND p.status = 'active'
-         AND p.expiry_date IS NOT NULL
-         AND p.expiry_date::date = (NOW() + ($1::int || ' days')::interval)::date
-         AND NOT EXISTS (
-           SELECT 1 FROM reminders r
-           WHERE r.client_id = p.client_id
-             AND r.type = 'renewal'
-             AND r.title = '保單到期提醒'
-             AND r.message LIKE CONCAT('%', $1::int, ' 日後到期%')
-         )`,
-      [days]
-    );
-  }
-}
-
 async function tick() {
   try {
-    await scheduleExpiringPolicies();
+    await scheduleExpiringPolicies(pool);
+    await scheduleBirthdayReminders(pool);
     await processDueReminders();
   } catch (err) {
     console.error('[worker] tick error', err);
