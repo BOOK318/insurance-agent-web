@@ -35,10 +35,11 @@ const VISION_MODEL  = process.env.OLLAMA_VISION_MODEL ?? 'qwen2.5vl:7b';
 const BASE_SYSTEM = `你係一個專業嘅香港保險Agent AI助手。
 
 職責：
-- 根據客戶背景分析保障缺口，提供銷售建議
+- 根據客戶背景及「現有保單」分析保障缺口，提供銷售建議
 - 解答保險問題（產品、核保、理賠流程）
 - 幫助分析財務需求、提供跟進策略
 - 分析客戶文件、表格、保單
+- 如客戶已有保單，必須先列出現有保障，再指出已覆蓋、重疊、缺口及可跟進方向；不可當客戶完全冇買過保險。
 
 注意：客戶資料會用代號顯示（[CLIENT]、[PHONE] 等）。
 回覆時直接用代號，唔好嘗試猜測或填入真實個人資料。
@@ -213,7 +214,24 @@ async function getOwnedClientContext(agentId: string, clientId: string) {
     'SELECT * FROM clients WHERE id = $1 AND agent_id = $2 AND deleted_at IS NULL',
     [clientId, agentId]
   );
-  return rows[0] ?? null;
+  const client = rows[0];
+  if (!client) return null;
+
+  const { rows: policies } = await db.query<Record<string, unknown>>(
+    `SELECT company, type, product_name, currency, premium, premium_frequency,
+            sum_assured, death_benefit, payment_period, breakeven_year,
+            breakeven_date, maturity_date, scenario_20y_pessimistic,
+            scenario_20y_optimistic, cash_value_notes, start_date, expiry_date,
+            status, notes
+     FROM policies
+     WHERE client_id = $1
+       AND agent_id = $2
+       AND deleted_at IS NULL
+     ORDER BY status = 'active' DESC, created_at DESC`,
+    [clientId, agentId]
+  );
+
+  return { ...client, policies };
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -377,7 +395,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: '找不到客戶' }, { status: 404 });
   }
   if (!clientContext && intent.intent === 'query_client' && intent.matched_client) {
-    clientContext = intent.matched_client.row;
+    clientContext = await getOwnedClientContext(user.id, intent.matched_client.id);
     resolvedClientName = intent.matched_client.name;
   }
 
@@ -438,8 +456,8 @@ export async function POST(req: NextRequest) {
   // Note about how the input was processed (for UI transparency)
   const processedNote = [
     imageWasProcessed ? '🔒 圖片由本地 Ollama 提取文字後傳送' : null,
-    resolvedClientName ? `📂 自動載入客戶：${resolvedClientName}（PII 已匿名）` : null,
-    clientContext && !resolvedClientName ? '🔐 客戶資料已匿名後傳送' : null,
+    resolvedClientName ? `📂 自動載入客戶：${resolvedClientName}（客戶及現有保單已匿名）` : null,
+    clientContext && !resolvedClientName ? '🔐 客戶及現有保單資料已匿名後傳送' : null,
   ].filter(Boolean).join(' · ') || null;
 
   return NextResponse.json({

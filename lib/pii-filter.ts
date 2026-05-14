@@ -22,6 +22,60 @@ export interface TokenMap {
   [token: string]: string;
 }
 
+function formatMoney(value: unknown, currency = 'HKD') {
+  if (value === null || value === undefined || value === '') return null;
+  const num = Number(value);
+  if (!Number.isFinite(num)) return null;
+  return `${currency} ${num.toLocaleString()}`;
+}
+
+function formatDateOnly(value: unknown) {
+  if (!value) return null;
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  const text = String(value);
+  return /^\d{4}-\d{2}-\d{2}/.test(text) ? text.slice(0, 10) : text;
+}
+
+function buildPolicyContextLines(policies: unknown[], scrubNotes: (s: string) => string) {
+  if (!Array.isArray(policies) || policies.length === 0) return [];
+
+  const lines = ['現有保單：'];
+  policies.slice(0, 20).forEach((raw, index) => {
+    if (!raw || typeof raw !== 'object') return;
+    const policy = raw as Record<string, unknown>;
+    const currency = String(policy.currency ?? 'HKD');
+    const parts = [
+      `#${index + 1}`,
+      policy.status ? `狀態：${policy.status as string}` : null,
+      policy.company ? `公司：${policy.company as string}` : null,
+      policy.type ? `類型：${policy.type as string}` : null,
+      policy.product_name ? `產品：${policy.product_name as string}` : null,
+      formatMoney(policy.premium, currency)
+        ? `保費：${formatMoney(policy.premium, currency)}${policy.premium_frequency ? `/${policy.premium_frequency as string}` : ''}`
+        : null,
+      formatMoney(policy.sum_assured, currency) ? `保額：${formatMoney(policy.sum_assured, currency)}` : null,
+      formatMoney(policy.death_benefit, currency) ? `身故保障：${formatMoney(policy.death_benefit, currency)}` : null,
+      policy.payment_period ? `供款期：${policy.payment_period as string}` : null,
+      policy.breakeven_year ? `回本年：約第 ${Number(policy.breakeven_year).toLocaleString()} 年` : null,
+      policy.scenario_20y_pessimistic || policy.scenario_20y_optimistic
+        ? `20年情景：悲觀 ${formatMoney(policy.scenario_20y_pessimistic, currency) ?? 'N/A'}，樂觀 ${formatMoney(policy.scenario_20y_optimistic, currency) ?? 'N/A'}`
+        : null,
+      formatDateOnly(policy.start_date) ? `開始日：${formatDateOnly(policy.start_date)}` : null,
+      formatDateOnly(policy.expiry_date) ? `到期日：${formatDateOnly(policy.expiry_date)}` : null,
+      policy.cash_value_notes ? `現金價值/回報備註：${scrubNotes(policy.cash_value_notes as string)}` : null,
+      policy.notes ? `保單備註：${scrubNotes(policy.notes as string)}` : null,
+    ].filter((part): part is string => !!part);
+
+    lines.push(`- ${parts.join('；')}`);
+  });
+
+  if (policies.length > 20) {
+    lines.push(`- 另有 ${policies.length - 20} 張保單未列出，請先查閱保單頁再作完整建議。`);
+  }
+
+  return lines;
+}
+
 /** Build anonymized context string + a token→real-value map */
 export function buildAnonymizedContext(client: Record<string, unknown>): {
   context: string;
@@ -80,6 +134,7 @@ export function buildAnonymizedContext(client: Record<string, unknown>): {
     client.existing_coverage_notes ? `現有保障：${scrubNotes(client.existing_coverage_notes as string)}` : null,
     client.financial_goals ? `財務目標：${scrubNotes(client.financial_goals as string)}` : null,
     client.notes ? `備註：${scrubNotes(client.notes as string)}` : null,
+    ...buildPolicyContextLines(client.policies as unknown[], scrubNotes),
   ].filter((l): l is string => l !== null);
 
   return { context: lines.join('\n'), tokenMap };
