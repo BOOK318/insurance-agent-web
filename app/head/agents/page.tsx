@@ -1,4 +1,5 @@
 import { db } from '../../../lib/db';
+import Link from 'next/link';
 
 export const dynamic = 'force-dynamic';
 
@@ -41,9 +42,17 @@ export default async function HeadAgentsPage() {
 
   return (
     <div>
-      <div className="mb-5">
-        <h1 className="text-xl font-bold">Agent列表</h1>
-        <p className="text-sm text-gray-500 mt-1">查看每位保險 Agent 嘅客戶、保單、Claim 同續保概況。</p>
+      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-xl font-bold">Agent列表</h1>
+          <p className="text-sm text-gray-500 mt-1">查看每位保險 Agent 嘅客戶、保單、Claim 同續保概況。</p>
+        </div>
+        <Link
+          href="/admin/users"
+          className="inline-flex items-center justify-center rounded-xl bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 transition"
+        >
+          ＋ 加 Agent
+        </Link>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
@@ -76,7 +85,7 @@ export default async function HeadAgentsPage() {
           ))}
           {rows.length === 0 && (
             <div className="px-4 py-8 text-center text-sm text-gray-500">
-              未有 Agent。請到帳號管理新增 Agent。
+              未有 Agent。請撳「加 Agent」新增。
             </div>
           )}
         </div>

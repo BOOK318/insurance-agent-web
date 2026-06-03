@@ -2,16 +2,13 @@ import { getSession } from '../../lib/auth';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 
-const baseMobileLinks = [
+const mobileLinks = [
   { href: '/', label: '主頁' },
-  { href: '/clients', label: '客戶' },
-  { href: '/policies', label: '保單' },
-  { href: '/claims', label: 'Claim' },
-  { href: '/reminders', label: '提醒' },
   { href: '/ai', label: 'AI' },
   { href: '/head', label: '業績' },
+  { href: '/head/agents', label: 'Agent' },
+  { href: '/admin/settings', label: '通知' },
   { href: '/admin/knowledge', label: 'AI知識' },
-  { href: '/admin/settings', label: '設定' },
 ];
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -19,23 +16,19 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   if (!user) redirect('/login');
   if (user.role === 'agent') redirect('/');
 
-  const isAdmin = user.role === 'admin';
-  const mobileLinks = isAdmin
-    ? [...baseMobileLinks.slice(0, 7), { href: '/admin/users', label: '帳號' }, ...baseMobileLinks.slice(7)]
-    : baseMobileLinks;
-
   return (
     <div className="flex min-h-screen bg-gray-50">
       <aside className="hidden md:flex flex-col w-56 bg-slate-900 text-white min-h-screen p-4">
-        <div className="text-lg font-bold mb-1">⚙️ {isAdmin ? '管理員' : 'Team Head'}</div>
+        <div className="text-lg font-bold mb-1">⚙️ {user.role === 'admin' ? '管理員' : 'Team Head'}</div>
         <p className="text-slate-400 text-xs mb-6">{user.name}</p>
         <nav className="flex flex-col gap-1">
-          {isAdmin && (
-            <Link href="/admin/users" className="text-sm text-slate-200 hover:bg-slate-800 px-3 py-2.5 rounded-lg">👥 帳號管理</Link>
-          )}
+          <Link href="/" className="text-sm text-slate-200 hover:bg-slate-800 px-3 py-2.5 rounded-lg">🏠 主頁</Link>
+          <Link href="/ai" className="text-sm text-slate-200 hover:bg-slate-800 px-3 py-2.5 rounded-lg">💬 AI</Link>
+          <Link href="/head" className="text-sm text-slate-200 hover:bg-slate-800 px-3 py-2.5 rounded-lg">📊 業績</Link>
+          <Link href="/head/agents" className="text-sm text-slate-200 hover:bg-slate-800 px-3 py-2.5 rounded-lg">👥 Agent</Link>
+          <Link href="/admin/settings" className="text-sm text-slate-200 hover:bg-slate-800 px-3 py-2.5 rounded-lg">📣 通知</Link>
           <Link href="/admin/knowledge" className="text-sm text-slate-200 hover:bg-slate-800 px-3 py-2.5 rounded-lg">🧠 AI 知識庫</Link>
-          <Link href="/admin/settings" className="text-sm text-slate-200 hover:bg-slate-800 px-3 py-2.5 rounded-lg">📣 通知公告</Link>
-          <Link href="/head" className="text-sm text-slate-400 hover:bg-slate-800 px-3 py-2.5 rounded-lg mt-4">→ Team總覽</Link>
+          <Link href="/admin/users" className="text-sm text-amber-300 hover:bg-slate-800 px-3 py-2.5 rounded-lg mt-2">＋ 加 Agent</Link>
         </nav>
       </aside>
       <main className="flex-1 p-4 md:p-6 max-w-3xl w-full mx-auto">

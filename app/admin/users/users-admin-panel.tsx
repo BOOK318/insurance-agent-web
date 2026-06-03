@@ -42,9 +42,11 @@ const EMPTY: CreateFields = {
 export function UsersAdminPanel({
   initialUsers,
   maxActiveUsers,
+  currentUserRole,
 }: {
   initialUsers: AdminUserRow[];
   maxActiveUsers: number;
+  currentUserRole: 'head' | 'admin';
 }) {
   const router = useRouter();
   const [fields, setFields] = useState<CreateFields>(EMPTY);
@@ -147,42 +149,45 @@ export function UsersAdminPanel({
 
   const activeCount = initialUsers.filter(user => user.is_active).length;
   const activeLimitReached = activeCount >= maxActiveUsers;
+  const isAdmin = currentUserRole === 'admin';
 
   return (
     <div>
       <div className="mb-5">
-        <h1 className="text-xl font-bold">帳號管理</h1>
+        <h1 className="text-xl font-bold">{isAdmin ? '帳號管理' : '加 Agent'}</h1>
         <p className="text-sm text-gray-500 mt-1">
-          建立 Agent / Team 總監帳號，停用離職帳號，或重設密碼。
+          {isAdmin ? '建立 Agent / Team 總監帳號，停用離職帳號，或重設密碼。' : '建立 Agent 帳號，停用離職 Agent，重設密碼，或刪除帳號。'}
         </p>
       </div>
 
       <div className="grid grid-cols-3 gap-2 mb-5">
-        <Stat label="總帳號" value={initialUsers.length} />
-        <Stat label={`啟用中 / ${maxActiveUsers}`} value={activeCount} />
+        <Stat label={isAdmin ? '總帳號' : 'Agent'} value={initialUsers.length} />
+        <Stat label={isAdmin ? `啟用中 / ${maxActiveUsers}` : '啟用 Agent'} value={activeCount} />
         <Stat label="Agent" value={initialUsers.filter(user => user.role === 'agent').length} />
       </div>
 
       <form onSubmit={createUser} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-5 space-y-3">
         <div className="flex items-center gap-2">
           <Plus size={16} className="text-blue-700" />
-          <p className="text-sm font-semibold">新增帳號</p>
+          <p className="text-sm font-semibold">{isAdmin ? '新增帳號' : '新增 Agent'}</p>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Field label="姓名" value={fields.name} onChange={v => set('name', v)} placeholder="Chan Tai Man" />
           <Field label="Email" value={fields.email} onChange={v => set('email', v)} type="email" placeholder="agent@team.local" />
-          <div>
-            <label className="text-xs text-gray-400 block mb-1">角色</label>
-            <select
-              value={fields.role}
-              onChange={e => set('role', e.target.value as AdminUserRow['role'])}
-              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-            >
-              <option value="agent">Agent</option>
-              <option value="head">Team 總監</option>
-              <option value="admin">管理員</option>
-            </select>
-          </div>
+          {isAdmin ? (
+            <div>
+              <label className="text-xs text-gray-400 block mb-1">角色</label>
+              <select
+                value={fields.role}
+                onChange={e => set('role', e.target.value as AdminUserRow['role'])}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+              >
+                <option value="agent">Agent</option>
+                <option value="head">Team 總監</option>
+                <option value="admin">管理員</option>
+              </select>
+            </div>
+          ) : null}
           <Field label="初始密碼" value={fields.password} onChange={v => set('password', v)} type="password" placeholder="至少 8 個字" />
         </div>
         <button
@@ -191,7 +196,7 @@ export function UsersAdminPanel({
           className="inline-flex items-center justify-center gap-2 bg-blue-700 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-blue-800 disabled:opacity-60 transition"
         >
           {creating ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
-          {creating ? '建立中...' : activeLimitReached ? '已達帳號上限' : '建立帳號'}
+          {creating ? '建立中...' : activeLimitReached ? '已達帳號上限' : isAdmin ? '建立帳號' : '建立 Agent'}
         </button>
         {activeLimitReached && (
           <p className="text-xs text-amber-700">

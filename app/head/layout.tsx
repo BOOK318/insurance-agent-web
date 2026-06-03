@@ -4,13 +4,11 @@ import Link from 'next/link';
 
 const mobileLinks = [
   { href: '/', label: '主頁' },
-  { href: '/clients', label: '客戶' },
-  { href: '/policies', label: '保單' },
-  { href: '/claims', label: 'Claim' },
-  { href: '/reminders', label: '提醒' },
   { href: '/ai', label: 'AI' },
   { href: '/head', label: '業績' },
   { href: '/head/agents', label: 'Agent' },
+  { href: '/admin/settings', label: '通知' },
+  { href: '/admin/knowledge', label: 'AI知識' },
 ];
 
 export default async function HeadLayout({ children }: { children: React.ReactNode }) {
@@ -25,14 +23,15 @@ export default async function HeadLayout({ children }: { children: React.ReactNo
         <div className="text-lg font-bold mb-1">👑 Team總覽</div>
         <p className="text-gray-400 text-xs mb-6">{user.name}</p>
         <nav className="flex flex-col gap-1">
+          <Link href="/" className="text-sm text-gray-200 hover:bg-gray-800 px-3 py-2.5 rounded-lg">🏠 主頁</Link>
+          <Link href="/ai" className="text-sm text-gray-200 hover:bg-gray-800 px-3 py-2.5 rounded-lg">💬 AI</Link>
           <Link href="/head" className="text-sm text-gray-200 hover:bg-gray-800 px-3 py-2.5 rounded-lg">📊 業績總覽</Link>
           <Link href="/head/agents" className="text-sm text-gray-200 hover:bg-gray-800 px-3 py-2.5 rounded-lg">👥 Agent列表</Link>
-          <Link href="/admin/settings" className="text-sm text-amber-300 hover:bg-gray-800 px-3 py-2.5 rounded-lg mt-2">📣 通知公告</Link>
+          <Link href="/admin/settings" className="text-sm text-amber-300 hover:bg-gray-800 px-3 py-2.5 rounded-lg">📣 通知公告</Link>
           <Link href="/admin/knowledge" className="text-sm text-amber-300 hover:bg-gray-800 px-3 py-2.5 rounded-lg">🧠 AI 知識庫</Link>
-          {isAdmin && (
-            <Link href="/admin/users" className="text-sm text-amber-300 hover:bg-gray-800 px-3 py-2.5 rounded-lg">👥 帳號管理</Link>
-          )}
-          <Link href="/" className="text-sm text-gray-400 hover:bg-gray-800 px-3 py-2.5 rounded-lg mt-4">← 返回我的頁面</Link>
+          <Link href="/admin/users" className="text-sm text-amber-300 hover:bg-gray-800 px-3 py-2.5 rounded-lg mt-2">
+            ＋ 加 Agent{isAdmin ? ' / 帳號' : ''}
+          </Link>
         </nav>
       </aside>
       <main className="flex-1 p-4 md:p-6 max-w-4xl w-full mx-auto">
@@ -43,17 +42,6 @@ export default async function HeadLayout({ children }: { children: React.ReactNo
                 {link.label}
               </Link>
             ))}
-            <Link href="/admin/settings" className="px-3 py-1.5 bg-amber-50 border border-amber-200 text-amber-800 rounded-full shadow-sm">
-              通知
-            </Link>
-            <Link href="/admin/knowledge" className="px-3 py-1.5 bg-amber-50 border border-amber-200 text-amber-800 rounded-full shadow-sm">
-              AI知識
-            </Link>
-            {isAdmin && (
-              <Link href="/admin/users" className="px-3 py-1.5 bg-amber-50 border border-amber-200 text-amber-800 rounded-full shadow-sm">
-                帳號
-              </Link>
-            )}
           </div>
         </div>
         {children}

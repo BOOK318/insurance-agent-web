@@ -27,6 +27,7 @@ import { getSetting } from '../../../lib/settings';
 import { db } from '../../../lib/db';
 import { getRelevantKnowledgeContext } from '../../../lib/knowledge';
 import { appendTruncationNotice, getAiReplyMaxTokens, trimConversationContent } from '../../../lib/ai-response.mjs';
+import { expandBocProductCodes, getBocProductCodeLegend } from '../../../lib/boc-product-codes';
 
 const OLLAMA_URL    = process.env.OLLAMA_URL          ?? 'http://localhost:11434';
 const TEXT_MODEL    = process.env.OLLAMA_MODEL        ?? 'qwen2.5:7b';
@@ -45,7 +46,15 @@ const BASE_SYSTEM = `你係一個專業嘅香港保險Agent AI助手。
 回覆時直接用代號，唔好嘗試猜測或填入真實個人資料。
 
 溝通：用廣東話，簡潔專業。涉及金額用HKD。
-長分析要用分點同小標題，優先完整覆蓋重點，避免寫成太長散文。`;
+長分析要用分點同小標題，優先完整覆蓋重點，避免寫成太長散文。
+
+產品代號規則：
+- 提及中銀人壽產品代號時，必須同時寫出產品短名，格式用頭兩個中文字，例如：IBW65（薪火）。
+- 唔好只寫 IBW65、IBN13、IBC10 呢類內部 code，因為客戶/其他同事未必明。
+- 如未肯定代號對應產品名，要明確寫「產品名待確認」，唔好估。
+
+常用中銀人壽產品代號：
+${getBocProductCodeLegend()}`;
 
 interface IncomingMessage {
   role: 'user' | 'assistant';
@@ -450,7 +459,7 @@ export async function POST(req: NextRequest) {
 
   const block = response.content[0];
   const rawReply = block.type === 'text' ? block.text : '...';
-  const reply = detokenize(appendTruncationNotice(rawReply, response.stop_reason), tokenMap);
+  const reply = expandBocProductCodes(detokenize(appendTruncationNotice(rawReply, response.stop_reason), tokenMap));
   await saveConversation(user.id, 'assistant', reply);
 
   // Note about how the input was processed (for UI transparency)

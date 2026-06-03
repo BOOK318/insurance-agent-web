@@ -8,15 +8,16 @@ export const dynamic = 'force-dynamic';
 
 export default async function AdminUsersPage() {
   const user = await getSession();
-  if (!user || user.role !== 'admin') redirect('/head');
+  if (!user || user.role === 'agent') redirect('/head');
 
   const { rows: users } = await db.query<AdminUserRow>(
     `SELECT id, name, email, role, is_active, created_at
      FROM users
+     ${user.role === 'admin' ? '' : "WHERE role = 'agent'"}
      ORDER BY
        CASE role WHEN 'admin' THEN 0 WHEN 'head' THEN 1 ELSE 2 END,
        created_at DESC`
   );
 
-  return <UsersAdminPanel initialUsers={users} maxActiveUsers={getMaxActiveUsers()} />;
+  return <UsersAdminPanel initialUsers={users} maxActiveUsers={getMaxActiveUsers()} currentUserRole={user.role} />;
 }

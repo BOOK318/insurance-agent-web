@@ -30,6 +30,12 @@ async function requireAdmin() {
   return user;
 }
 
+async function requireHeadOrAdmin() {
+  const user = await getSession();
+  if (!user || user.role === 'agent') return null;
+  return user;
+}
+
 export async function GET() {
   const user = await requireAdmin();
   if (!user) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
@@ -45,7 +51,7 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const user = await requireAdmin();
+  const user = await requireHeadOrAdmin();
   if (!user) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const body = await req.json() as Record<string, unknown>;
@@ -59,6 +65,9 @@ export async function POST(req: NextRequest) {
   }
   if (!ROLES.has(role)) {
     return NextResponse.json({ error: '角色不正確' }, { status: 400 });
+  }
+  if (user.role === 'head' && role !== 'agent') {
+    return NextResponse.json({ error: 'Team Head 只可以新增 Agent 帳號' }, { status: 403 });
   }
   if (!isStrongPassword(password)) {
     return NextResponse.json({ error: '密碼最少 10 個字，並要包含大楷、小楷同數字' }, { status: 400 });
@@ -108,7 +117,7 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
-  const user = await requireAdmin();
+  const user = await requireHeadOrAdmin();
   if (!user) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const body = await req.json() as Record<string, unknown>;
@@ -126,7 +135,7 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: '密碼最少 10 個字，並要包含大楷、小楷同數字' }, { status: 400 });
   }
   if (hasActive && body.is_active === false && id === user.id) {
-    return NextResponse.json({ error: '唔可以停用自己嘅管理員帳號' }, { status: 400 });
+    return NextResponse.json({ error: '唔可以停用自己嘅帳號' }, { status: 400 });
   }
   if (hasActive && body.is_active === true) {
     const maxActiveUsers = getMaxActiveUsers();
@@ -137,6 +146,18 @@ export async function PATCH(req: NextRequest) {
         { status: 400 }
       );
     }
+  }
+
+  const { rows: targets } = await db.query<{ id: string; role: Role }>(
+    'SELECT id, role FROM users WHERE id = $1',
+    [id]
+  );
+  const target = targets[0];
+  if (!target) {
+    return NextResponse.json({ error: '找不到帳號' }, { status: 404 });
+  }
+  if (user.role === 'head' && target.role !== 'agent') {
+    return NextResponse.json({ error: 'Team Head 只可以管理 Agent 帳號' }, { status: 403 });
   }
 
   const sets: string[] = [];
@@ -167,10 +188,6 @@ export async function PATCH(req: NextRequest) {
     params
   );
 
-  if (!rows[0]) {
-    return NextResponse.json({ error: '找不到帳號' }, { status: 404 });
-  }
-
   await writeAuditLog({
     actorUserId: user.id,
     action: password ? 'admin.user.password_reset' : 'admin.user.updated',
@@ -185,13 +202,13 @@ export async function PATCH(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const user = await requireAdmin();
+  const user = await requireHeadOrAdmin();
   if (!user) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const id = text(req.nextUrl.searchParams.get('id'));
   if (!id) return NextResponse.json({ error: '缺少帳號 ID' }, { status: 400 });
   if (id === user.id) {
-    return NextResponse.json({ error: '唔可以刪除自己嘅管理員帳號' }, { status: 400 });
+    return NextResponse.json({ error: '唔可以刪除自己嘅帳號' }, { status: 400 });
   }
 
   const body = await req.json().catch(() => ({})) as { confirm_email?: unknown };
@@ -209,6 +226,9 @@ export async function DELETE(req: NextRequest) {
   );
   const target = targets[0];
   if (!target) return NextResponse.json({ error: '找不到帳號' }, { status: 404 });
+  if (user.role === 'head' && target.role !== 'agent') {
+    return NextResponse.json({ error: 'Team Head 只可以管理 Agent 帳號' }, { status: 403 });
+  }
   if (target.email.toLowerCase() !== confirmEmail) {
     return NextResponse.json(
       { error: '確認 Email 唔啱，請輸入嗰個帳號嘅 Email' },
